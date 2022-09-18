@@ -11,11 +11,16 @@
 #include <SPI.h>
 #include <max6675.h>
 
-#define TFT_CS 15
+#define TFT_CS 5
 #define TFT_RST 2
 #define TFT_DC 0
-#define TFT_MOSI 4  // Data out
-#define TFT_SCLK 16 // Clock out
+#define TFT_MOSI 23 // Data out
+#define TFT_SCLK 18 // Clock out
+
+#define touch_Interrupt 36
+#define touch_Data 19
+#define touch_CS 17
+#define touch_CLK 18
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
@@ -23,7 +28,7 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 #define textColor 0xFFFF
 
 #define TEMP_SO 26
-#define TEMP_CS1 12
+#define TEMP_CS1 33
 #define TEMP_CS2 14
 #define TEMP_CS3 27
 #define TEMP_SCK 25
@@ -31,6 +36,23 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 MAX6675 TEMP1(TEMP_SCK, TEMP_CS1, TEMP_SO);
 MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
 MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
+
+// Button definitions
+#define button1 32
+#define button2 35
+#define button3 34
+#define button4 39
+int buttonPins[4] = {32, 35, 34, 39};
+int buttonState[4] = {0, 0, 0, 0};
+int lastButtonState[4] = {0, 0, 0, 0};
+int buttonPressed[4] = {0, 0, 0, 0};
+unsigned long debounceDelay = 50;
+unsigned long lastDebounce;
+
+const int tftDelay = 1;
+unsigned long lastTFTwrite;
+const int MS_TO_S = 1000;    // ms in s conversion factor
+const int US_TO_S = 1000000; // us in s conversion factor
 
 int standardLeadfree[5][2]{
     170, 85,
@@ -159,6 +181,7 @@ void homeScreen(int solderProfile[5][2])
   int Y = graphCoord[0][1];
   float sumTime = 0;
   float maxTemp = solderProfile[2][0];
+  // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int n = 0; n < 5; n++)
   {
     sumTime = sumTime + solderProfile[n][1];
@@ -171,9 +194,19 @@ void homeScreen(int solderProfile[5][2])
     Y = graphCoord[0][1] - deltaY;
     X = X + deltaX;
   }
+  // end of reflow curve calculation
 
   tft.fillRect(5, 5, 2, 134, textColor);   // y-axis
   tft.fillRect(5, 137, 310, 2, textColor); // x-axis
+
+  // textbox for abort
+  tft.fillRect(15, 10, 100, 15, textColor);
+  tft.setCursor(17, 14);
+  tft.setTextColor(backgroundColor);
+  tft.println("Press 2 to abort");
+  tft.setTextColor(textColor);
+
+  // print max temp and total time of selected profile
   tft.setCursor(100, 105);
   tft.print("Max. Temp.: ");
   tft.print(maxTemp, 0);
@@ -187,25 +220,80 @@ void homeScreen(int solderProfile[5][2])
   tft.println(" s");
 }
 
+void startScreen()
+{
+  int lineCount = 5;
+  tft.fillScreen(backgroundColor);
+  tft.setTextSize(1);
+  tft.setTextColor(backgroundColor);
+  for (int i = 0; i < lineCount; i++)
+  {
+    const char *content[4] = {"Start Reflow", "Select Profile", "Placeholder", "Placeholder"};
+    if (i == 0)
+    {
+      tft.fillRect(100, 50, 120, 40, textColor);
+      tft.setCursor(107, 57);
+      tft.println("Selected Profile:");
+      tft.setCursor(107, 75);
+      tft.println("Standard Unleaded");
+    }
+    else
+    {
+      tft.fillRect(100, 95 + 25 * (i - 1), 20, 20, textColor);
+      tft.setCursor(108, 101 + 25 * (i - 1));
+      tft.println(i);
+      tft.fillRect(125, 95 + 25 * (i - 1), 95, 20, textColor);
+      tft.setCursor(130, 101 + 25 * (i - 1));
+      tft.println(content[i - 1]);
+    }
+  }
+}
+
+void readButtons()
+{
+  for (int i = 0; i < 4; i++)
+  { // Button Reading Routine
+    int reading = digitalRead(buttonPins[i]);
+    if (reading != lastButtonState[i])
+    {
+      lastDebounce = millis();
+    }
+    if ((millis() - lastDebounce) > debounceDelay)
+    {
+      if (reading != buttonState[i])
+      {
+        buttonState[i] = reading;
+
+        if (buttonState[i] == HIGH)
+        { // Write Button Event here
+          buttonPressed[i] = 1;
+        }
+      }
+    }
+    lastButtonState[i] = reading;
+    // End Button Reading Routine
+  }
+}
+
 void setup(void)
 {
   Serial.begin(115200);
-  delay(5000);
-  Serial.print(F("Temp Sensor test"));
+  // delay(5000);
+  pinMode(button1, INPUT);
+  pinMode(button2, INPUT);
+  pinMode(button3, INPUT);
+  pinMode(button4, INPUT);
+  Serial.println(F("Temp Sensor test"));
   tft.init(240, 320); // Init ST7789 320x240
   Serial.println(F("TFT Initialized"));
   tft.invertDisplay(false);
   tft.fillScreen(ST77XX_BLACK);
   tft.setRotation(45);
 
-  homeScreen(standardLeaded);
-  delay(5000);
-  homeScreen(fastLeaded);
-  delay(5000);
-  homeScreen(standardLeadfree);
-  delay(5000);
-  homeScreen(fastLeadfree);
-  delay(5000);
+  // homeScreen(standardLeaded);
+  // delay(5000);
+  startScreen();
+  // tft.fillScreen(backgroundColor);
 
   Serial.println(F("Temperature Readings:"));
   Serial.print(F("Sensor 1: "));
@@ -221,4 +309,24 @@ void setup(void)
 
 void loop()
 {
+  readButtons();
+  if (millis() >= lastTFTwrite + tftDelay * MS_TO_S)
+  {
+    if (buttonPressed[0] == 1)
+    {
+      homeScreen(standardLeadfree);
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      startScreen();
+    }
+    String msg = "Buttons: ";
+    for (int i = 0; i < 4; i++)
+    {
+      msg = msg + String(buttonPressed[i]) + " ";
+      buttonPressed[i] = 0;
+    }
+    Serial.println(msg);
+    lastTFTwrite = millis();
+  }
 }
