@@ -24,8 +24,8 @@
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
-#define backgroundColor 0x0820
-#define textColor 0xFFFF
+#define BACKGROUND_COLOR 0x0820
+#define TEXT_COLOR 0xFFFF
 
 #define TEMP_SO 26
 #define TEMP_CS1 33
@@ -81,12 +81,12 @@ int solderProfiles[5 * profileAmount][2]{170, 85,  170, 100, 260, 45,  260, 25, 
 
 void homeScreen(int profileID)
 {
-  tft.fillScreen(backgroundColor);
-  tft.setTextColor(textColor);
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextColor(TEXT_COLOR);
 
   // print chart for temp curve
   tft.setTextSize(1);
-  tft.fillRect(201, 144, 114, 91, textColor);
+  tft.fillRect(201, 144, 114, 91, TEXT_COLOR);
 
   const int tempX[3] = {203, 240, 277};
   const int tempY[6] = {146, 164, 178, 192, 206, 220};
@@ -107,7 +107,7 @@ void homeScreen(int profileID)
       {
         height = valueHeight;
       }
-      tft.fillRect(tempX[x], tempY[y], tempWidth, height, backgroundColor);
+      tft.fillRect(tempX[x], tempY[y], tempWidth, height, BACKGROUND_COLOR);
     }
   }
 
@@ -146,7 +146,7 @@ void homeScreen(int profileID)
 
   // print chart for status
   tft.setTextSize(1);
-  tft.fillRect(5, 148, 150, 87, textColor);
+  tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
 
   const int statX[2] = {7, 109};
   const int statY[5] = {150, 167, 184, 201, 218};
@@ -167,7 +167,7 @@ void homeScreen(int profileID)
       {
         width = vWidth;
       }
-      tft.fillRect(statX[x], statY[y], width, statHeight, backgroundColor);
+      tft.fillRect(statX[x], statY[y], width, statHeight, BACKGROUND_COLOR);
     }
   }
 
@@ -194,23 +194,23 @@ void homeScreen(int profileID)
   {
     int deltaX = (solderProfiles[(profileID * 5) + i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
     int deltaY = (solderProfiles[(profileID * 5) + i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
-    tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, textColor);
+    tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, TEXT_COLOR);
     Y = graphCoord[0][1] - deltaY;
     X = X + deltaX;
   }
   // end of reflow curve calculation
 
-  tft.fillRect(5, 5, 2, 134, textColor);   // y-axis
-  tft.fillRect(5, 137, 310, 2, textColor); // x-axis
+  tft.fillRect(5, 5, 2, 134, TEXT_COLOR);   // y-axis
+  tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 
   // textbox for abort
-  tft.fillRect(15, 10, 100, 30, textColor);
-  tft.setTextColor(backgroundColor);
+  tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
+  tft.setTextColor(BACKGROUND_COLOR);
   tft.setCursor(17, 14);
   tft.println("Press 1 to abort");
   tft.setCursor(17, 29);
   tft.println("Press 2 to start");
-  tft.setTextColor(textColor);
+  tft.setTextColor(TEXT_COLOR);
 
   // print max temp and total time of selected profile
   tft.setCursor(100, 105);
@@ -230,11 +230,11 @@ void startScreen()
 {
   const int lineCount = 5;
 
-  tft.fillScreen(backgroundColor);
+  tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextSize(1);
-  tft.setTextColor(backgroundColor);
+  tft.setTextColor(BACKGROUND_COLOR);
 
-  tft.fillRect(100, 50, 120, 40, textColor);
+  tft.fillRect(100, 50, 120, 40, TEXT_COLOR);
   tft.setCursor(107, 57);
   tft.println("Selected Profile:");
   tft.setCursor(107, 75);
@@ -248,10 +248,10 @@ void startScreen()
 
 inline void printStartScreenOption(const int line, const char *text)
 {
-  tft.fillRect(100, 95 + 25 * line, 20, 20, textColor);
+  tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
   tft.setCursor(108, 101 + 25 * line);
   tft.println(line + 1);
-  tft.fillRect(125, 95 + 25 * line, 95, 20, textColor);
+  tft.fillRect(125, 95 + 25 * line, 95, 20, TEXT_COLOR);
   tft.setCursor(130, 101 + 25 * line);
   tft.println(text);
 }
@@ -302,7 +302,7 @@ void setup(void)
   // homeScreen(standardLeaded);
   // delay(5000);
   startScreen();
-  // tft.fillScreen(backgroundColor);
+  // tft.fillScreen(BACKGROUND_COLOR);
 
   Serial.println(F("Temperature Readings:"));
   Serial.print(F("Sensor 1: "));
