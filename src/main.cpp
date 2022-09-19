@@ -54,35 +54,58 @@ unsigned long lastTFTwrite;
 const int MS_TO_S = 1000;    // ms in s conversion factor
 const int US_TO_S = 1000000; // us in s conversion factor
 
-int standardLeadfree[5][2]{
+// Menu definitions
+enum machineState
+{
+  start,
+  profileSelect,
+  reflow
+} currentState;
+
+const int profileAmount = 6;
+enum profileNumber
+{
+  standardUnleaded,
+  fastUnleaded,
+  standardLeaded,
+  fastLeaded,
+  custom1,
+  custom2
+} currentProfile;
+const char *profileNames[profileAmount] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded", "Standard Leaded", "Custom 1", "Custom 2"};
+int solderProfiles[5 * profileAmount][2]{
     170, 85,
     170, 100,
     260, 45,
     260, 25,
-    30, 60};
-
-int fastLeadfree[5][2]{
+    30, 60,
     150, 30,
     200, 60,
     260, 20,
     260, 20,
-    30, 40};
-
-int standardLeaded[5][2]{
+    30, 40,
     150, 75,
     150, 90,
     220, 35,
     220, 35,
-    30, 65};
-
-int fastLeaded[5][2]{
+    30, 65,
     130, 35,
     180, 30,
     230, 20,
     230, 30,
-    30, 50};
+    30, 50,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0,
+    0, 0};
 
-void homeScreen(int solderProfile[5][2])
+void homeScreen(int profileID)
 {
   tft.fillScreen(backgroundColor);
   tft.setTextColor(textColor);
@@ -135,7 +158,7 @@ void homeScreen(int solderProfile[5][2])
         else
         {
           char msg[3];
-          sprintf(msg, "%d", solderProfile[y - 1][x - 1]);
+          sprintf(msg, "%d", solderProfiles[(profileID * 5) + (y - 1)][x - 1]);
           tft.print(msg);
         }
       }
@@ -180,16 +203,16 @@ void homeScreen(int solderProfile[5][2])
   int X = graphCoord[0][0];
   int Y = graphCoord[0][1];
   float sumTime = 0;
-  float maxTemp = solderProfile[2][0];
+  float maxTemp = solderProfiles[(profileID * 5) + 2][0];
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int n = 0; n < 5; n++)
   {
-    sumTime = sumTime + solderProfile[n][1];
+    sumTime = sumTime + solderProfiles[(profileID * 5) + n][1];
   }
   for (int i = 0; i < 5; i++)
   {
-    int deltaX = (solderProfile[i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
-    int deltaY = (solderProfile[i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
+    int deltaX = (solderProfiles[(profileID * 5) + i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
+    int deltaY = (solderProfiles[(profileID * 5) + i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
     tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, textColor);
     Y = graphCoord[0][1] - deltaY;
     X = X + deltaX;
@@ -200,10 +223,12 @@ void homeScreen(int solderProfile[5][2])
   tft.fillRect(5, 137, 310, 2, textColor); // x-axis
 
   // textbox for abort
-  tft.fillRect(15, 10, 100, 15, textColor);
-  tft.setCursor(17, 14);
+  tft.fillRect(15, 10, 100, 30, textColor);
   tft.setTextColor(backgroundColor);
-  tft.println("Press 2 to abort");
+  tft.setCursor(17, 14);
+  tft.println("Press 1 to abort");
+  tft.setCursor(17, 29);
+  tft.println("Press 2 to start");
   tft.setTextColor(textColor);
 
   // print max temp and total time of selected profile
@@ -312,12 +337,15 @@ void loop()
   readButtons();
   if (millis() >= lastTFTwrite + tftDelay * MS_TO_S)
   {
-    if (buttonPressed[0] == 1)
+    if (buttonPressed[0] == 1 && currentState == start)
     {
-      homeScreen(standardLeadfree);
+      currentState = reflow;
+      currentProfile = standardLeaded;
+      homeScreen(currentProfile);
     }
-    else if (buttonPressed[1] == 1)
+    else if (buttonPressed[0] == 1 && currentState == reflow)
     {
+      currentState = start;
       startScreen();
     }
     String msg = "Buttons: ";
