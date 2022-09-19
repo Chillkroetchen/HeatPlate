@@ -1,9 +1,3 @@
-// CS = 15
-// RESET = 2
-// DC = 0
-// SDI (MOSI) = 4
-// SCK = 16
-
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
@@ -16,11 +10,6 @@
 #define TFT_DC 0
 #define TFT_MOSI 23 // Data out
 #define TFT_SCLK 18 // Clock out
-
-#define touch_Interrupt 36
-#define touch_Data 19
-#define touch_CS 17
-#define touch_CLK 18
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
@@ -38,46 +27,52 @@ MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
 MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
 
 // Button definitions
-#define button1 32
-#define button2 35
-#define button3 34
-#define button4 39
-int buttonPins[4] = {32, 35, 34, 39};
+#define BUTTON1 32
+#define BUTTON2 35
+#define BUTTON3 34
+#define BUTTON4 39
+#define DEBOUNCE_DELAY 50
+const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON3};
 int buttonState[4] = {0, 0, 0, 0};
 int lastButtonState[4] = {0, 0, 0, 0};
 int buttonPressed[4] = {0, 0, 0, 0};
-unsigned long debounceDelay = 50;
 unsigned long lastDebounce;
 
-const int tftDelay = 1;
+#define TFT_DELAY 1
 unsigned long lastTFTwrite;
-const int MS_TO_S = 1000;    // ms in s conversion factor
-const int US_TO_S = 1000000; // us in s conversion factor
+
+#define MS_TO_S 1000    // ms in s conversion factor
+#define US_TO_S 1000000 // us in s conversion factor
 
 // Menu definitions
-enum machineState
+enum State
 {
-  start,
-  profileSelect,
-  reflow
+  STATE_START,
+  STATE_PROFILE_SELECTION,
+  STATE_REFLOW
 } currentState;
 
-const int profileAmount = 6;
-enum profileNumber
+enum Profile
 {
-  standardUnleaded,
-  fastUnleaded,
-  standardLeaded,
-  fastLeaded,
-  custom1,
-  custom2
+  PROFILE_STANDARD_UNLEADED,
+  PROFILE_FAST_UNLEADED,
+  PROFILE_STANDARD_LEADED,
+  PROFILE_FAST_LEADED,
+  PROFILE_CUSTOM1,
+  PROFILE_CUSTOM2,
+  MAX,
 } currentProfile;
-const char *profileNames[profileAmount] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded",
-                                           "Standard Leaded",   "Custom 1",      "Custom 2"};
-int solderProfiles[5 * profileAmount][2]{170, 85,  170, 100, 260, 45,  260, 25,  30, 60,  150, 30,  200, 60, 260,
-                                         20,  260, 20,  30,  40,  150, 75,  150, 90, 220, 35,  220, 35,  30, 65,
-                                         130, 35,  180, 30,  230, 20,  230, 30,  30, 50,  0,   0,   0,   0,  0,
-                                         0,   0,   0,   0,   0,   0,   0,   0,   0,  0,   0,   0,   0,   0,  0};
+
+const char *PROFILE_NAMES[Profile::MAX] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded",
+                                           "Fast Leaded",       "Custom 1",      "Custom 2"};
+const int SOLDER_PROFILES[Profile::MAX][5][2]{
+    {{170, 85}, {170, 100}, {260, 45}, {260, 25}, {30, 60}}, // Standard Unleaded
+    {{150, 30}, {200, 60}, {260, 20}, {260, 20}, {30, 40}},  // Fast Unleaded
+    {{150, 75}, {150, 90}, {220, 35}, {220, 35}, {30, 65}},  // Standard Leaded
+    {{130, 35}, {180, 30}, {230, 20}, {230, 30}, {30, 50}},  // Fast Leaded
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},                // Custom 1
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
+};
 
 void homeScreen(int profileID)
 {
@@ -137,7 +132,7 @@ void homeScreen(int profileID)
         else
         {
           char msg[3];
-          sprintf(msg, "%d", solderProfiles[(profileID * 5) + (y - 1)][x - 1]);
+          sprintf(msg, "%d", SOLDER_PROFILES[profileID][y - 1][x - 1]);
           tft.print(msg);
         }
       }
@@ -180,7 +175,7 @@ void homeScreen(int profileID)
 
   // print coordinate system
   const int graphCoord[2][2] = {12, 132, 310, 10};
-  const float maxTemp = solderProfiles[(profileID * 5) + 2][0];
+  const float maxTemp = SOLDER_PROFILES[profileID][2][0];
   float sumTime = 0;
   int X = graphCoord[0][0];
   int Y = graphCoord[0][1];
@@ -188,12 +183,12 @@ void homeScreen(int profileID)
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int n = 0; n < 5; n++)
   {
-    sumTime = sumTime + solderProfiles[(profileID * 5) + n][1];
+    sumTime = sumTime + SOLDER_PROFILES[profileID][n][1];
   }
   for (int i = 0; i < 5; i++)
   {
-    int deltaX = (solderProfiles[(profileID * 5) + i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
-    int deltaY = (solderProfiles[(profileID * 5) + i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
+    int deltaX = (SOLDER_PROFILES[profileID][i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
+    int deltaY = (SOLDER_PROFILES[profileID][i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
     tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, TEXT_COLOR);
     Y = graphCoord[0][1] - deltaY;
     X = X + deltaX;
@@ -260,7 +255,7 @@ void readButtons()
 {
   for (int i = 0; i < 4; i++)
   {
-    const int reading = digitalRead(buttonPins[i]);
+    const int reading = digitalRead(BUTTON_PINS[i]);
 
     if (reading != lastButtonState[i])
     {
@@ -269,7 +264,7 @@ void readButtons()
 
     lastButtonState[i] = reading;
 
-    if (!((millis() - lastDebounce) > debounceDelay && reading != buttonState[i]))
+    if (!((millis() - lastDebounce) > DEBOUNCE_DELAY && reading != buttonState[i]))
     {
       return;
     }
@@ -288,10 +283,10 @@ void setup(void)
   Serial.begin(115200);
 
   // delay(5000);
-  pinMode(button1, INPUT);
-  pinMode(button2, INPUT);
-  pinMode(button3, INPUT);
-  pinMode(button4, INPUT);
+  pinMode(BUTTON1, INPUT);
+  pinMode(BUTTON2, INPUT);
+  pinMode(BUTTON3, INPUT);
+  pinMode(BUTTON4, INPUT);
   Serial.println(F("Temp Sensor test"));
   tft.init(240, 320); // Init ST7789 320x240
   Serial.println(F("TFT Initialized"));
@@ -299,7 +294,7 @@ void setup(void)
   tft.fillScreen(ST77XX_BLACK);
   tft.setRotation(45);
 
-  // homeScreen(standardLeaded);
+  // homeScreen(STANDARD_LEADED);
   // delay(5000);
   startScreen();
   // tft.fillScreen(BACKGROUND_COLOR);
@@ -320,20 +315,20 @@ void loop()
 {
   readButtons();
 
-  if (millis() < lastTFTwrite + tftDelay * MS_TO_S)
+  if (millis() < lastTFTwrite + TFT_DELAY * MS_TO_S)
   {
     return;
   }
 
-  if (buttonPressed[0] == 1 && currentState == start)
+  if (buttonPressed[0] == 1 && currentState == STATE_START)
   {
-    currentState = reflow;
-    currentProfile = standardLeaded;
+    currentState = STATE_REFLOW;
+    currentProfile = PROFILE_STANDARD_LEADED;
     homeScreen(currentProfile);
   }
-  else if (buttonPressed[0] == 1 && currentState == reflow)
+  else if (buttonPressed[0] == 1 && currentState == STATE_REFLOW)
   {
-    currentState = start;
+    currentState = STATE_START;
     startScreen();
   }
 
