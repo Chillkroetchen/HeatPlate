@@ -233,6 +233,7 @@ void startScreen()
   tft.fillScreen(backgroundColor);
   tft.setTextSize(1);
   tft.setTextColor(backgroundColor);
+
   for (int i = 0; i < lineCount; i++)
   {
     const char *content[4] = {"Start Reflow", "Select Profile", "Placeholder", "Placeholder"};
@@ -259,27 +260,32 @@ void startScreen()
 void readButtons()
 {
   for (int i = 0; i < 4; i++)
-  { // Button Reading Routine
-    const int reading = digitalRead(buttonPins[i]);
+  {
+    readButton(i);
+  }
+}
 
-    if (reading != lastButtonState[i])
-    {
-      lastDebounce = millis();
-    }
-    if ((millis() - lastDebounce) > debounceDelay)
-    {
-      if (reading != buttonState[i])
-      {
-        buttonState[i] = reading;
+inline void readButton(const int id)
+{
+  const int reading = digitalRead(buttonPins[id]);
 
-        if (buttonState[i] == HIGH)
-        { // Write Button Event here
-          buttonPressed[i] = 1;
-        }
-      }
-    }
-    lastButtonState[i] = reading;
-    // End Button Reading Routine
+  if (reading != lastButtonState[id])
+  {
+    lastDebounce = millis();
+  }
+
+  lastButtonState[id] = reading;
+
+  if (!((millis() - lastDebounce) > debounceDelay && reading != buttonState[id]))
+  {
+    return;
+  }
+
+  buttonState[id] = reading;
+
+  if (buttonState[id] == HIGH)
+  { // Write Button Event here
+    buttonPressed[id] = 1;
   }
 }
 
