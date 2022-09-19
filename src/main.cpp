@@ -74,70 +74,12 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
-void homeScreen(int profileID)
+void homeScreen(int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(TEXT_COLOR);
 
-  // print chart for temp curve
-  tft.setTextSize(1);
-  tft.fillRect(201, 144, 114, 91, TEXT_COLOR);
-
-  const int tempX[3] = {203, 240, 277};
-  const int tempY[6] = {146, 164, 178, 192, 206, 220};
-  const int tempWidth = 36;
-  const int titleHeight = 16;
-  const int valueHeight = 13;
-
-  for (int x = 0; x < 3; x++)
-  {
-    for (int y = 0; y < 6; y++)
-    {
-      int height;
-      if (y == 0)
-      {
-        height = titleHeight;
-      }
-      else
-      {
-        height = valueHeight;
-      }
-      tft.fillRect(tempX[x], tempY[y], tempWidth, height, BACKGROUND_COLOR);
-    }
-  }
-
-  const char *tempTitle[3] = {"Point", "Temp", "Time"};
-
-  for (int y = 0; y < 6; y++)
-  {
-    const int titleXoffset = 3;
-    const int valueXoffset = 10;
-    const int titleYoffset = 4;
-    const int valueYoffset = 3;
-
-    for (int x = 0; x < 3; x++)
-    {
-      if (y == 0)
-      {
-        tft.setCursor(tempX[x] + titleXoffset, tempY[y] + titleYoffset);
-        tft.print(tempTitle[x]);
-      }
-      else
-      {
-        tft.setCursor(tempX[x] + valueXoffset, tempY[y] + valueYoffset);
-        if (x == 0)
-        {
-          tft.print(y);
-        }
-        else
-        {
-          char msg[3];
-          sprintf(msg, "%d", SOLDER_PROFILES[profileID][y - 1][x - 1]);
-          tft.print(msg);
-        }
-      }
-    }
-  }
+  printTemperatureChart(profileId);
 
   // print chart for status
   tft.setTextSize(1);
@@ -175,7 +117,7 @@ void homeScreen(int profileID)
 
   // print coordinate system
   const int graphCoord[2][2] = {12, 132, 310, 10};
-  const float maxTemp = SOLDER_PROFILES[profileID][2][0];
+  const float maxTemp = SOLDER_PROFILES[profileId][2][0];
   float sumTime = 0;
   int X = graphCoord[0][0];
   int Y = graphCoord[0][1];
@@ -183,12 +125,12 @@ void homeScreen(int profileID)
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int n = 0; n < 5; n++)
   {
-    sumTime = sumTime + SOLDER_PROFILES[profileID][n][1];
+    sumTime = sumTime + SOLDER_PROFILES[profileId][n][1];
   }
   for (int i = 0; i < 5; i++)
   {
-    int deltaX = (SOLDER_PROFILES[profileID][i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
-    int deltaY = (SOLDER_PROFILES[profileID][i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
+    int deltaX = (SOLDER_PROFILES[profileId][i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
+    int deltaY = (SOLDER_PROFILES[profileId][i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
     tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, TEXT_COLOR);
     Y = graphCoord[0][1] - deltaY;
     X = X + deltaX;
@@ -219,6 +161,61 @@ void homeScreen(int profileID)
   tft.print("Total Time: ");
   tft.print(sumTime, 0);
   tft.println(" s");
+}
+
+inline void printTemperatureChart(const int profileId)
+{
+  // print chart for temp curve
+  tft.setTextSize(1);
+  tft.fillRect(201, 144, 114, 91, TEXT_COLOR);
+
+  const char *tempTitle[3] = {"Point", "Temp", "Time"};
+  const int tempX[3] = {203, 240, 277};
+  const int tempY[6] = {146, 164, 178, 192, 206, 220};
+  const int tempWidth = 36;
+  const int titleHeight = 16;
+  const int valueHeight = 13;
+  const int titleXoffset = 3;
+  const int valueXoffset = 10;
+  const int titleYoffset = 4;
+  const int valueYoffset = 3;
+
+  for (int x = 0; x < 3; x++)
+  {
+    for (int y = 0; y < 6; y++)
+    {
+      int height;
+      if (y == 0)
+      {
+        height = titleHeight;
+      }
+      else
+      {
+        height = valueHeight;
+      }
+      tft.fillRect(tempX[x], tempY[y], tempWidth, height, BACKGROUND_COLOR);
+
+      if (y == 0)
+      {
+        tft.setCursor(tempX[x] + titleXoffset, tempY[y] + titleYoffset);
+        tft.print(tempTitle[x]);
+      }
+      else
+      {
+        tft.setCursor(tempX[x] + valueXoffset, tempY[y] + valueYoffset);
+        if (x == 0)
+        {
+          tft.print(y);
+        }
+        else
+        {
+          char msg[3];
+          sprintf(msg, "%d", SOLDER_PROFILES[profileId][y - 1][x - 1]);
+          tft.print(msg);
+        }
+      }
+    }
+  }
 }
 
 void startScreen()
