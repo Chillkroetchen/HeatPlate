@@ -167,61 +167,48 @@ inline void printTemperatureChart(const int profileId)
 {
   // print chart for temp curve
   tft.setTextSize(1);
+
+  // print border
   tft.fillRect(201, 144, 114, 91, TEXT_COLOR);
 
-  const char *tempTitle[3] = {"Point", "Temp", "Time"};
-  const int tempX[3] = {203, 240, 277};
-  const int tempY[6] = {146, 164, 178, 192, 206, 220};
-  const int tempWidth = 36;
-  const int titleHeight = 16;
-  const int valueHeight = 13;
-  const int titleXoffset = 3;
-  const int valueXoffset = 10;
-  const int titleYoffset = 4;
-  const int valueYoffset = 3;
+  const int COLUMNS = 3;
+  const int ROWS = 6;
+  const int WIDTH = 36;
+  const char *TITLES[COLUMNS] = {"Point", "Temp", "Time"};
+  const int X_VALUES[COLUMNS] = {203, 240, 277};
+  const int Y_VALUES[ROWS] = {146, 164, 178, 192, 206, 220};
 
-  for (int x = 0; x < 3; x++)
+  char cell_content_buf[3];
+
+  for (int col = 0; col < COLUMNS; col++)
   {
-    for (int y = 0; y < 6; y++)
-    {
-      int height;
-      if (y == 0)
-      {
-        height = titleHeight;
-      }
-      else
-      {
-        height = valueHeight;
-      }
-      tft.fillRect(tempX[x], tempY[y], tempWidth, height, BACKGROUND_COLOR);
+    // print title of column
+    tft.fillRect(X_VALUES[col], Y_VALUES[0], WIDTH, 16, BACKGROUND_COLOR);
+    tft.setCursor(X_VALUES[col] + 3, Y_VALUES[0] + 4);
+    tft.print(TITLES[col]);
 
-      if (y == 0)
+    // print colum data
+    for (int row = 1; row < ROWS; row++)
+    {
+      tft.fillRect(X_VALUES[col], Y_VALUES[row], WIDTH, 13, BACKGROUND_COLOR);
+      tft.setCursor(X_VALUES[col] + 10, Y_VALUES[row] + 3);
+
+      if (col == 0)
       {
-        tft.setCursor(tempX[x] + titleXoffset, tempY[y] + titleYoffset);
-        tft.print(tempTitle[x]);
+        // print point number
+        tft.print(row);
+        continue;
       }
-      else
-      {
-        tft.setCursor(tempX[x] + valueXoffset, tempY[y] + valueYoffset);
-        if (x == 0)
-        {
-          tft.print(y);
-        }
-        else
-        {
-          char msg[3];
-          sprintf(msg, "%d", SOLDER_PROFILES[profileId][y - 1][x - 1]);
-          tft.print(msg);
-        }
-      }
+
+      // print temperature or time
+      sprintf(cell_content_buf, "%d", SOLDER_PROFILES[profileId][row - 1][col - 1]);
+      tft.print(cell_content_buf);
     }
   }
 }
 
 void startScreen()
 {
-  const int lineCount = 5;
-
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextSize(1);
   tft.setTextColor(BACKGROUND_COLOR);
