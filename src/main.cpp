@@ -234,27 +234,26 @@ void startScreen()
   tft.setTextSize(1);
   tft.setTextColor(backgroundColor);
 
-  for (int i = 0; i < lineCount; i++)
-  {
-    const char *content[4] = {"Start Reflow", "Select Profile", "Placeholder", "Placeholder"};
-    if (i == 0)
-    {
-      tft.fillRect(100, 50, 120, 40, textColor);
-      tft.setCursor(107, 57);
-      tft.println("Selected Profile:");
-      tft.setCursor(107, 75);
-      tft.println("Standard Unleaded");
-    }
-    else
-    {
-      tft.fillRect(100, 95 + 25 * (i - 1), 20, 20, textColor);
-      tft.setCursor(108, 101 + 25 * (i - 1));
-      tft.println(i);
-      tft.fillRect(125, 95 + 25 * (i - 1), 95, 20, textColor);
-      tft.setCursor(130, 101 + 25 * (i - 1));
-      tft.println(content[i - 1]);
-    }
-  }
+  tft.fillRect(100, 50, 120, 40, textColor);
+  tft.setCursor(107, 57);
+  tft.println("Selected Profile:");
+  tft.setCursor(107, 75);
+  tft.println("Standard Unleaded");
+
+  printStartScreenOption(0, "Start Reflow");
+  printStartScreenOption(1, "Select Profile");
+  printStartScreenOption(2, "Placeholder");
+  printStartScreenOption(3, "Placeholder");
+}
+
+inline void printStartScreenOption(const int line, const char *text)
+{
+  tft.fillRect(100, 95 + 25 * line, 20, 20, textColor);
+  tft.setCursor(108, 101 + 25 * line);
+  tft.println(line + 1);
+  tft.fillRect(125, 95 + 25 * line, 95, 20, textColor);
+  tft.setCursor(130, 101 + 25 * line);
+  tft.println(text);
 }
 
 void readButtons()
