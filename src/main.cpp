@@ -4,10 +4,10 @@
 // SDI (MOSI) = 4
 // SCK = 16
 
-#include <Arduino.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
+#include <Arduino.h>
 #include <SPI.h>
 #include <max6675.h>
 
@@ -72,38 +72,12 @@ enum profileNumber
   custom1,
   custom2
 } currentProfile;
-const char *profileNames[profileAmount] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded", "Standard Leaded", "Custom 1", "Custom 2"};
-int solderProfiles[5 * profileAmount][2]{
-    170, 85,
-    170, 100,
-    260, 45,
-    260, 25,
-    30, 60,
-    150, 30,
-    200, 60,
-    260, 20,
-    260, 20,
-    30, 40,
-    150, 75,
-    150, 90,
-    220, 35,
-    220, 35,
-    30, 65,
-    130, 35,
-    180, 30,
-    230, 20,
-    230, 30,
-    30, 50,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0,
-    0, 0};
+const char *profileNames[profileAmount] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded",
+                                           "Standard Leaded",   "Custom 1",      "Custom 2"};
+int solderProfiles[5 * profileAmount][2]{170, 85,  170, 100, 260, 45,  260, 25,  30, 60,  150, 30,  200, 60, 260,
+                                         20,  260, 20,  30,  40,  150, 75,  150, 90, 220, 35,  220, 35,  30, 65,
+                                         130, 35,  180, 30,  230, 20,  230, 30,  30, 50,  0,   0,   0,   0,  0,
+                                         0,   0,   0,   0,   0,   0,   0,   0,   0,  0,   0,   0,   0,   0,  0};
 
 void homeScreen(int profileID)
 {
@@ -197,9 +171,7 @@ void homeScreen(int profileID)
   }
 
   // print coordinate system
-  int graphCoord[2][2] = {
-      12, 132,
-      310, 10};
+  int graphCoord[2][2] = {12, 132, 310, 10};
   int X = graphCoord[0][0];
   int Y = graphCoord[0][1];
   float sumTime = 0;
