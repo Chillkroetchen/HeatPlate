@@ -87,11 +87,13 @@ void homeScreen(int profileID)
   // print chart for temp curve
   tft.setTextSize(1);
   tft.fillRect(201, 144, 114, 91, textColor);
-  int tempX[3] = {203, 240, 277};
-  int tempY[6] = {146, 164, 178, 192, 206, 220};
-  int tempWidth = 36;
-  int titleHeight = 16;
-  int valueHeight = 13;
+
+  const int tempX[3] = {203, 240, 277};
+  const int tempY[6] = {146, 164, 178, 192, 206, 220};
+  const int tempWidth = 36;
+  const int titleHeight = 16;
+  const int valueHeight = 13;
+
   for (int x = 0; x < 3; x++)
   {
     for (int y = 0; y < 6; y++)
@@ -108,13 +110,16 @@ void homeScreen(int profileID)
       tft.fillRect(tempX[x], tempY[y], tempWidth, height, backgroundColor);
     }
   }
+
   const char *tempTitle[3] = {"Point", "Temp", "Time"};
+
   for (int y = 0; y < 6; y++)
   {
-    int titleXoffset = 3;
-    int valueXoffset = 10;
-    int titleYoffset = 4;
-    int valueYoffset = 3;
+    const int titleXoffset = 3;
+    const int valueXoffset = 10;
+    const int titleYoffset = 4;
+    const int valueYoffset = 3;
+
     for (int x = 0; x < 3; x++)
     {
       if (y == 0)
@@ -142,11 +147,13 @@ void homeScreen(int profileID)
   // print chart for status
   tft.setTextSize(1);
   tft.fillRect(5, 148, 150, 87, textColor);
-  int statX[2] = {7, 109};
-  int statY[5] = {150, 167, 184, 201, 218};
-  int lWidth = 100;
-  int vWidth = 44;
-  int statHeight = 15;
+
+  const int statX[2] = {7, 109};
+  const int statY[5] = {150, 167, 184, 201, 218};
+  const int lWidth = 100;
+  const int vWidth = 44;
+  const int statHeight = 15;
+
   for (int x = 0; x < 2; x++)
   {
     for (int y = 0; y < 5; y++)
@@ -163,6 +170,7 @@ void homeScreen(int profileID)
       tft.fillRect(statX[x], statY[y], width, statHeight, backgroundColor);
     }
   }
+
   const char *statLable[5] = {"Temp MCU:", "Temp Housing:", "Temp Setpoint:", "Temp Plate:", "Runtime:"};
   for (int i = 0; i < 5; i++)
   {
@@ -171,11 +179,12 @@ void homeScreen(int profileID)
   }
 
   // print coordinate system
-  int graphCoord[2][2] = {12, 132, 310, 10};
+  const int graphCoord[2][2] = {12, 132, 310, 10};
+  const float maxTemp = solderProfiles[(profileID * 5) + 2][0];
+  float sumTime = 0;
   int X = graphCoord[0][0];
   int Y = graphCoord[0][1];
-  float sumTime = 0;
-  float maxTemp = solderProfiles[(profileID * 5) + 2][0];
+
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int n = 0; n < 5; n++)
   {
@@ -219,7 +228,8 @@ void homeScreen(int profileID)
 
 void startScreen()
 {
-  int lineCount = 5;
+  const int lineCount = 5;
+
   tft.fillScreen(backgroundColor);
   tft.setTextSize(1);
   tft.setTextColor(backgroundColor);
@@ -250,7 +260,8 @@ void readButtons()
 {
   for (int i = 0; i < 4; i++)
   { // Button Reading Routine
-    int reading = digitalRead(buttonPins[i]);
+    const int reading = digitalRead(buttonPins[i]);
+
     if (reading != lastButtonState[i])
     {
       lastDebounce = millis();
@@ -275,6 +286,7 @@ void readButtons()
 void setup(void)
 {
   Serial.begin(115200);
+
   // delay(5000);
   pinMode(button1, INPUT);
   pinMode(button2, INPUT);
@@ -307,6 +319,7 @@ void setup(void)
 void loop()
 {
   readButtons();
+
   if (millis() >= lastTFTwrite + tftDelay * MS_TO_S)
   {
     if (buttonPressed[0] == 1 && currentState == start)
@@ -320,6 +333,7 @@ void loop()
       currentState = start;
       startScreen();
     }
+
     String msg = "Buttons: ";
     for (int i = 0; i < 4; i++)
     {
@@ -327,6 +341,7 @@ void loop()
       buttonPressed[i] = 0;
     }
     Serial.println(msg);
+
     lastTFTwrite = millis();
   }
 }
