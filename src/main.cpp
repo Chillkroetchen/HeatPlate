@@ -260,31 +260,26 @@ void readButtons()
 {
   for (int i = 0; i < 4; i++)
   {
-    readButton(i);
-  }
-}
+    const int reading = digitalRead(buttonPins[i]);
 
-inline void readButton(const int id)
-{
-  const int reading = digitalRead(buttonPins[id]);
+    if (reading != lastButtonState[i])
+    {
+      lastDebounce = millis();
+    }
 
-  if (reading != lastButtonState[id])
-  {
-    lastDebounce = millis();
-  }
+    lastButtonState[i] = reading;
 
-  lastButtonState[id] = reading;
+    if (!((millis() - lastDebounce) > debounceDelay && reading != buttonState[i]))
+    {
+      return;
+    }
 
-  if (!((millis() - lastDebounce) > debounceDelay && reading != buttonState[id]))
-  {
-    return;
-  }
+    buttonState[i] = reading;
 
-  buttonState[id] = reading;
-
-  if (buttonState[id] == HIGH)
-  { // Write Button Event here
-    buttonPressed[id] = 1;
+    if (buttonState[i] == HIGH)
+    { // Write Button Event here
+      buttonPressed[i] = 1;
+    }
   }
 }
 
