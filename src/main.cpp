@@ -320,28 +320,30 @@ void loop()
 {
   readButtons();
 
-  if (millis() >= lastTFTwrite + tftDelay * MS_TO_S)
+  if (millis() < lastTFTwrite + tftDelay * MS_TO_S)
   {
-    if (buttonPressed[0] == 1 && currentState == start)
-    {
-      currentState = reflow;
-      currentProfile = standardLeaded;
-      homeScreen(currentProfile);
-    }
-    else if (buttonPressed[0] == 1 && currentState == reflow)
-    {
-      currentState = start;
-      startScreen();
-    }
-
-    String msg = "Buttons: ";
-    for (int i = 0; i < 4; i++)
-    {
-      msg = msg + String(buttonPressed[i]) + " ";
-      buttonPressed[i] = 0;
-    }
-    Serial.println(msg);
-
-    lastTFTwrite = millis();
+    return;
   }
+
+  if (buttonPressed[0] == 1 && currentState == start)
+  {
+    currentState = reflow;
+    currentProfile = standardLeaded;
+    homeScreen(currentProfile);
+  }
+  else if (buttonPressed[0] == 1 && currentState == reflow)
+  {
+    currentState = start;
+    startScreen();
+  }
+
+  String msg = "Buttons: ";
+  for (int i = 0; i < 4; i++)
+  {
+    msg = msg + String(buttonPressed[i]) + " ";
+    buttonPressed[i] = 0;
+  }
+  Serial.println(msg);
+
+  lastTFTwrite = millis();
 }
