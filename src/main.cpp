@@ -104,16 +104,9 @@ void homeScreen(int profileId)
 
   // print max temp and total time of selected profile
   tft.setCursor(100, 105);
-  tft.print("Max. Temp.: ");
-  tft.print(max_temp, 0);
-  tft.print(" ");
-  tft.cp437(true);
-  tft.write(167);
-  tft.println("C");
+  tft.printf("Max temp: %d °C\n", (int)max_temp);
   tft.setCursor(100, 120);
-  tft.print("Total Time: ");
-  tft.print(sum_time, 0);
-  tft.println(" s");
+  tft.printf("Total time: %d s\n", (int)sum_time);
 }
 
 inline void printTemperatureChart(const int profileId)
@@ -270,9 +263,9 @@ void setup(void)
   pinMode(BUTTON2, INPUT);
   pinMode(BUTTON3, INPUT);
   pinMode(BUTTON4, INPUT);
-  Serial.println(F("Temp Sensor test"));
+  Serial.println("Temp Sensor test");
   tft.init(240, 320); // Init ST7789 320x240
-  Serial.println(F("TFT Initialized"));
+  Serial.println("TFT Initialized");
   tft.invertDisplay(false);
   tft.fillScreen(ST77XX_BLACK);
   tft.setRotation(45);
@@ -282,16 +275,10 @@ void setup(void)
   startScreen();
   // tft.fillScreen(BACKGROUND_COLOR);
 
-  Serial.println(F("Temperature Readings:"));
-  Serial.print(F("Sensor 1: "));
-  Serial.print(TEMP1.readCelsius());
-  Serial.println(F(" °C"));
-  Serial.print(F("Sensor 2: "));
-  Serial.print(TEMP2.readCelsius());
-  Serial.println(F(" °C"));
-  Serial.print(F("Sensor 3: "));
-  Serial.print(TEMP3.readCelsius());
-  Serial.println(F(" °C"));
+  Serial.println("Temperature Readings:");
+  Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
+  Serial.printf("\tSensor 2: %f °C", TEMP2.readCelsius());
+  Serial.printf("\tSensor 3: %f °C", TEMP3.readCelsius());
 }
 
 void loop()
@@ -318,7 +305,7 @@ void loop()
   String msg = "Buttons: ";
   for (int i = 0; i < 4; i++)
   {
-    msg = msg + String(buttonPressed[i]) + " ";
+    msg += String(buttonPressed[i]) + " ";
     buttonPressed[i] = 0;
   }
   Serial.println(msg);
