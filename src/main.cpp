@@ -37,7 +37,7 @@ MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
 #define BUTTON3 34
 #define BUTTON4 39
 #define DEBOUNCE_DELAY 50
-const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON3};
+const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON4};
 int buttonState[4] = {0, 0, 0, 0};
 int lastButtonState[4] = {0, 0, 0, 0};
 int buttonPressed[4] = {0, 0, 0, 0};
@@ -83,27 +83,26 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
 void readButtons()
 {
   for (int i = 0; i < 4; i++)
-  {
-    const int reading = digitalRead(BUTTON_PINS[i]);
-
+  { // Button Reading Routine
+    int reading = digitalRead(BUTTON_PINS[i]);
     if (reading != lastButtonState[i])
     {
       lastDebounce = millis();
     }
-
-    lastButtonState[i] = reading;
-
-    if (!((millis() - lastDebounce) > DEBOUNCE_DELAY && reading != buttonState[i]))
+    if ((millis() - lastDebounce) > DEBOUNCE_DELAY)
     {
-      return;
-    }
+      if (reading != buttonState[i])
+      {
+        buttonState[i] = reading;
 
-    buttonState[i] = reading;
-
-    if (buttonState[i] == HIGH)
-    { // Write Button Event here
-      buttonPressed[i] = 1;
+        if (buttonState[i] == HIGH)
+        { // Write Button Event here
+          buttonPressed[i] = 1;
+        }
+      }
     }
+    lastButtonState[i] = reading;
+    // End Button Reading Routine
   }
 }
 
@@ -145,11 +144,12 @@ void profileSelectScreen()
   tft.setCursor(88, 67);
   tft.println("Select Profile:");
 
-  for (int i = 0; i < Profile::MAX; i++)
+  // for (int i = 0; i < Profile::MAX; i++) use this line to include custom profiles in screen
+  for (int i = 0; i < 4; i++)
   {
     tft.fillRect(80, 85 + 25 * i, 20, 20, TEXT_COLOR);
     tft.setCursor(88, 92 + 25 * i);
-    tft.println(i);
+    tft.println(i + 1);
     tft.fillRect(105, 85 + 25 * i, 135, 20, TEXT_COLOR);
     tft.setCursor(110, 92 + 25 * i);
     tft.println(PROFILE_NAMES[i]);
@@ -225,7 +225,7 @@ inline void printStatusChart()
 inline void printStatusChartValues(const float max_temp, const float sum_time)
 {
   tft.setTextSize(1);
-  tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
+  // tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
 
   const int COLUMNS = 5;
   const int Y_VALUES[COLUMNS] = {150, 167, 184, 201, 218};
@@ -238,14 +238,14 @@ inline void printStatusChartValues(const float max_temp, const float sum_time)
     switch (row)
     {
     case 0:
-      tft.print(TEMP1.readCelsius());
+      tft.print(int(TEMP1.readCelsius()));
       tft.print(" ");
       tft.cp437(true);
       tft.write(167);
       tft.println("C");
       break;
     case 1:
-      tft.print(TEMP2.readCelsius());
+      tft.print(int(TEMP2.readCelsius()));
       tft.print(" ");
       tft.cp437(true);
       tft.write(167);
@@ -259,7 +259,7 @@ inline void printStatusChartValues(const float max_temp, const float sum_time)
       tft.println("C");
       break;
     case 3:
-      tft.print(TEMP3.readCelsius());
+      tft.print(int(TEMP3.readCelsius()));
       tft.print(" ");
       tft.cp437(true);
       tft.write(167);
@@ -358,6 +358,7 @@ void reflowLandingScreen(int profileId)
     if (millis() >= lastTFTwrite + 1000)
     {
       printStatusChartValues(max_temp, sum_time);
+      lastTFTwrite = millis();
     }
   }
 }
@@ -398,6 +399,8 @@ void loop()
     return;
   }
 
+  // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
+
   switch (currentState)
   {
   case STATE_START:
@@ -437,8 +440,13 @@ void loop()
     }
     else if (buttonPressed[3] == 1)
     {
+      Serial.println(buttonPressed[3]);
       buttonPressed[3] = 0;
       currentProfile = PROFILE_FAST_LEADED;
+    }
+    else
+    {
+      break;
     }
 
     currentState = STATE_START;
