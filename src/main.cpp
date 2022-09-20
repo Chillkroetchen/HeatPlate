@@ -80,65 +80,18 @@ void homeScreen(int profileId)
   tft.setTextColor(TEXT_COLOR);
 
   printTemperatureChart(profileId);
+  printStatusChart();
 
-  // print chart for status
-  tft.setTextSize(1);
-  tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
-
-  const int statX[2] = {7, 109};
-  const int statY[5] = {150, 167, 184, 201, 218};
-  const int lWidth = 100;
-  const int vWidth = 44;
-  const int statHeight = 15;
-
-  for (int x = 0; x < 2; x++)
-  {
-    for (int y = 0; y < 5; y++)
-    {
-      int width;
-      if (x == 0)
-      {
-        width = lWidth;
-      }
-      else
-      {
-        width = vWidth;
-      }
-      tft.fillRect(statX[x], statY[y], width, statHeight, BACKGROUND_COLOR);
-    }
-  }
-
-  const char *statLable[5] = {"Temp MCU:", "Temp Housing:", "Temp Setpoint:", "Temp Plate:", "Runtime:"};
+  // this does not need to be done every time.
+  // consider caching the result
+  const float max_temp = SOLDER_PROFILES[profileId][2][0];
+  float sum_time = 0;
   for (int i = 0; i < 5; i++)
   {
-    tft.setCursor(statX[0] + 3, statY[i] + 4);
-    tft.println(statLable[i]);
+    sum_time += SOLDER_PROFILES[profileId][i][1];
   }
 
-  // print coordinate system
-  const int graphCoord[2][2] = {12, 132, 310, 10};
-  const float maxTemp = SOLDER_PROFILES[profileId][2][0];
-  float sumTime = 0;
-  int X = graphCoord[0][0];
-  int Y = graphCoord[0][1];
-
-  // calculate X/Y coordinates of reflow curve in respect to screen space available
-  for (int n = 0; n < 5; n++)
-  {
-    sumTime = sumTime + SOLDER_PROFILES[profileId][n][1];
-  }
-  for (int i = 0; i < 5; i++)
-  {
-    int deltaX = (SOLDER_PROFILES[profileId][i][1] / sumTime) * (graphCoord[1][0] - graphCoord[0][0]);
-    int deltaY = (SOLDER_PROFILES[profileId][i][0] / maxTemp) * (graphCoord[0][1] - graphCoord[1][1]);
-    tft.drawLine(X, Y, X + deltaX, graphCoord[0][1] - deltaY, TEXT_COLOR);
-    Y = graphCoord[0][1] - deltaY;
-    X = X + deltaX;
-  }
-  // end of reflow curve calculation
-
-  tft.fillRect(5, 5, 2, 134, TEXT_COLOR);   // y-axis
-  tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
+  printTemperatureGraph(profileId, max_temp, sum_time);
 
   // textbox for abort
   tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
@@ -152,14 +105,14 @@ void homeScreen(int profileId)
   // print max temp and total time of selected profile
   tft.setCursor(100, 105);
   tft.print("Max. Temp.: ");
-  tft.print(maxTemp, 0);
+  tft.print(max_temp, 0);
   tft.print(" ");
   tft.cp437(true);
   tft.write(167);
   tft.println("C");
   tft.setCursor(100, 120);
   tft.print("Total Time: ");
-  tft.print(sumTime, 0);
+  tft.print(sum_time, 0);
   tft.println(" s");
 }
 
@@ -205,6 +158,52 @@ inline void printTemperatureChart(const int profileId)
       tft.print(cell_content_buf);
     }
   }
+}
+
+inline void printStatusChart()
+{
+  tft.setTextSize(1);
+  tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
+
+  const int COLUMNS = 5;
+  const int Y_VALUES[COLUMNS] = {150, 167, 184, 201, 218};
+  const char *LABEL[COLUMNS] = {"Temp MCU:", "Temp Housing:", "Temp Setpoint:", "Temp Plate:", "Runtime:"};
+
+  for (int row = 0; row < COLUMNS; row++)
+  {
+    tft.fillRect(7, Y_VALUES[row], 100, 15, BACKGROUND_COLOR);
+    tft.fillRect(109, Y_VALUES[row], 44, 15, BACKGROUND_COLOR);
+    tft.setCursor(10, Y_VALUES[row] + 4);
+    tft.println(LABEL[row]);
+  }
+}
+
+inline void printTemperatureGraph(const int profileId, const float max_temp, const float max_time)
+{
+  const int BOTTOM_LEFT_X = 12;
+  const int BOTTOM_LEFT_Y = 132;
+  const int TOP_RIGHT_X = 310;
+  const int TOP_RIGHT_Y = 10;
+  const int WIDTH = TOP_RIGHT_X - BOTTOM_LEFT_X;
+  const int HEIGHT = BOTTOM_LEFT_Y - TOP_RIGHT_Y;
+
+  int x = BOTTOM_LEFT_X;
+  int y = BOTTOM_LEFT_Y;
+
+  // calculate X/Y coordinates of reflow curve in respect to screen space available
+  for (int i = 0; i < 5; i++)
+  {
+    int deltaX = (SOLDER_PROFILES[profileId][i][1] / max_time) * WIDTH;
+    int deltaY = (SOLDER_PROFILES[profileId][i][0] / max_temp) * HEIGHT;
+
+    tft.drawLine(x, y, x + deltaX, BOTTOM_LEFT_Y - deltaY, TEXT_COLOR);
+
+    y = BOTTOM_LEFT_Y - deltaY;
+    x += deltaX;
+  }
+
+  tft.fillRect(5, 5, 2, 134, TEXT_COLOR);   // y-axis
+  tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 }
 
 void startScreen()
