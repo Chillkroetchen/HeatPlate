@@ -11,6 +11,11 @@
 #define TFT_MOSI 23 // Data out
 #define TFT_SCLK 18 // Clock out
 
+#define TOUCH_INTERRUPT 36
+#define TOUCH_DATA 19
+#define TOUCH_CS 17
+#define TOUCH_CLK 18
+
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
 #define BACKGROUND_COLOR 0x0820
@@ -38,7 +43,7 @@ int lastButtonState[4] = {0, 0, 0, 0};
 int buttonPressed[4] = {0, 0, 0, 0};
 unsigned long lastDebounce;
 
-#define TFT_DELAY 1
+#define TFT_DELAY 100
 unsigned long lastTFTwrite;
 
 #define MS_TO_S 1000    // ms in s conversion factor
@@ -49,7 +54,8 @@ enum State
 {
   STATE_START,
   STATE_PROFILE_SELECTION,
-  STATE_REFLOW
+  STATE_REFLOW_LANDING,
+  STATE_REFLOW_STARTED,
 } currentState;
 
 enum Profile
@@ -74,7 +80,60 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
-void homeScreen(int profileId)
+void startScreen(const int profileId)
+{
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextSize(1);
+  tft.setTextColor(BACKGROUND_COLOR);
+
+  tft.fillRect(100, 50, 120, 40, TEXT_COLOR);
+  tft.setCursor(107, 57);
+  tft.println("Selected Profile:");
+  tft.setCursor(107, 75);
+  tft.println(PROFILE_NAMES[profileId]);
+
+  printStartScreenOption(0, "Start Reflow");
+  printStartScreenOption(1, "Select Profile");
+  printStartScreenOption(2, "Placeholder");
+  printStartScreenOption(3, "Placeholder");
+}
+
+inline void printStartScreenOption(const int line, const char *text)
+{
+  tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
+  tft.setCursor(108, 101 + 25 * line);
+  tft.println(line + 1);
+  tft.fillRect(125, 95 + 25 * line, 95, 20, TEXT_COLOR);
+  tft.setCursor(130, 101 + 25 * line);
+  tft.println(text);
+}
+
+void profileSelectScreen()
+{
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextSize(1);
+  tft.setTextColor(BACKGROUND_COLOR);
+
+  tft.fillRect(80, 60, 160, 20, TEXT_COLOR);
+  tft.setCursor(88, 67);
+  tft.println("Select Profile:");
+
+  for (int i = 0; i < Profile::MAX; i++)
+  {
+    tft.fillRect(80, 85 + 25 * i, 20, 20, TEXT_COLOR);
+    tft.setCursor(88, 92 + 25 * i);
+    tft.println(i);
+    tft.fillRect(105, 85 + 25 * i, 135, 20, TEXT_COLOR);
+    tft.setCursor(110, 92 + 25 * i);
+    tft.println(PROFILE_NAMES[i]);
+  }
+}
+
+void reflowStartedScreen()
+{
+}
+
+void reflowLandingScreen(int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(TEXT_COLOR);
@@ -107,6 +166,32 @@ void homeScreen(int profileId)
   tft.printf("Max temp: %d C\n", (int)max_temp);
   tft.setCursor(100, 120);
   tft.printf("Total time: %d s\n", (int)sum_time);
+
+  // endless loop to keep screen updated
+  while (true)
+  {
+    readButtons();
+
+    if (buttonPressed[0] == 1)
+    {
+      buttonPressed[0] = 0;
+      currentState = STATE_START;
+      startScreen(currentProfile);
+      break;
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      buttonPressed[1] = 0;
+      currentState = STATE_REFLOW_STARTED;
+      reflowStartedScreen();
+      break;
+    }
+
+    if (millis() >= lastTFTwrite + 1000)
+    {
+      printStatusChartValues(max_temp, sum_time);
+    }
+  }
 }
 
 inline void printTemperatureChart(const int profileId)
@@ -171,6 +256,57 @@ inline void printStatusChart()
   }
 }
 
+inline void printStatusChartValues(const float max_temp, const float sum_time)
+{
+  tft.setTextSize(1);
+  tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
+
+  const int COLUMNS = 5;
+  const int Y_VALUES[COLUMNS] = {150, 167, 184, 201, 218};
+
+  for (int row = 0; row < COLUMNS; row++)
+  {
+    tft.fillRect(109, 150 + ((15 + 2) * row), 44, 15, BACKGROUND_COLOR);
+    tft.setCursor(109 + 3, 150 + ((15 + 2) * row) + 4);
+
+    switch (row)
+    {
+    case 0:
+      tft.print(TEMP1.readCelsius());
+      tft.print(" ");
+      tft.cp437(true);
+      tft.write(167);
+      tft.println("C");
+      break;
+    case 1:
+      tft.print(TEMP2.readCelsius());
+      tft.print(" ");
+      tft.cp437(true);
+      tft.write(167);
+      tft.println("C");
+      break;
+    case 2:
+      tft.print(int(max_temp));
+      tft.print(" ");
+      tft.cp437(true);
+      tft.write(167);
+      tft.println("C");
+      break;
+    case 3:
+      tft.print(TEMP3.readCelsius());
+      tft.print(" ");
+      tft.cp437(true);
+      tft.write(167);
+      tft.println("C");
+      break;
+    case 4:
+      tft.print(int(sum_time));
+      tft.println(" s");
+      break;
+    }
+  }
+}
+
 inline void printTemperatureGraph(const int profileId, const float max_temp, const float max_time)
 {
   const int BOTTOM_LEFT_X = 12;
@@ -199,32 +335,8 @@ inline void printTemperatureGraph(const int profileId, const float max_temp, con
   tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 }
 
-void startScreen()
+void updateReflowValues()
 {
-  tft.fillScreen(BACKGROUND_COLOR);
-  tft.setTextSize(1);
-  tft.setTextColor(BACKGROUND_COLOR);
-
-  tft.fillRect(100, 50, 120, 40, TEXT_COLOR);
-  tft.setCursor(107, 57);
-  tft.println("Selected Profile:");
-  tft.setCursor(107, 75);
-  tft.println("Standard Unleaded");
-
-  printStartScreenOption(0, "Start Reflow");
-  printStartScreenOption(1, "Select Profile");
-  printStartScreenOption(2, "Placeholder");
-  printStartScreenOption(3, "Placeholder");
-}
-
-inline void printStartScreenOption(const int line, const char *text)
-{
-  tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
-  tft.setCursor(108, 101 + 25 * line);
-  tft.println(line + 1);
-  tft.fillRect(125, 95 + 25 * line, 95, 20, TEXT_COLOR);
-  tft.setCursor(130, 101 + 25 * line);
-  tft.println(text);
 }
 
 void readButtons()
@@ -258,7 +370,6 @@ void setup(void)
 {
   Serial.begin(115200);
 
-  // delay(5000);
   pinMode(BUTTON1, INPUT);
   pinMode(BUTTON2, INPUT);
   pinMode(BUTTON3, INPUT);
@@ -270,10 +381,7 @@ void setup(void)
   tft.fillScreen(ST77XX_BLACK);
   tft.setRotation(45);
 
-  // homeScreen(STANDARD_LEADED);
-  // delay(5000);
-  startScreen();
-  // tft.fillScreen(BACKGROUND_COLOR);
+  startScreen(currentProfile);
 
   Serial.println("Temperature Readings:");
   Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
@@ -285,30 +393,60 @@ void loop()
 {
   readButtons();
 
-  if (millis() < lastTFTwrite + TFT_DELAY * MS_TO_S)
+  if (millis() < lastTFTwrite + TFT_DELAY)
   {
     return;
   }
 
   if (buttonPressed[0] == 1 && currentState == STATE_START)
   {
-    currentState = STATE_REFLOW;
-    currentProfile = PROFILE_STANDARD_LEADED;
-    homeScreen(currentProfile);
+    buttonPressed[0] = 0;
+    currentState = STATE_REFLOW_LANDING;
+    reflowLandingScreen(currentProfile);
   }
-  else if (buttonPressed[0] == 1 && currentState == STATE_REFLOW)
+  else if (buttonPressed[0] == 1 && currentState == STATE_REFLOW_LANDING)
   {
+    buttonPressed[0] = 0;
     currentState = STATE_START;
-    startScreen();
+    startScreen(currentProfile);
   }
-
-  String msg = "Buttons: ";
+  else if (buttonPressed[1] == 1 && currentState == STATE_START)
+  {
+    buttonPressed[1] = 0;
+    currentState = STATE_PROFILE_SELECTION;
+    profileSelectScreen();
+  }
+  else if (buttonPressed[0] == 1 && currentState == STATE_PROFILE_SELECTION)
+  {
+    buttonPressed[0] = 0;
+    currentState = STATE_START;
+    currentProfile = PROFILE_STANDARD_UNLEADED;
+    startScreen(currentProfile);
+  }
+  else if (buttonPressed[1] == 1 && currentState == STATE_PROFILE_SELECTION)
+  {
+    buttonPressed[1] = 0;
+    currentState = STATE_START;
+    currentProfile = PROFILE_FAST_UNLEADED;
+    startScreen(currentProfile);
+  }
+  else if (buttonPressed[2] == 1 && currentState == STATE_PROFILE_SELECTION)
+  {
+    buttonPressed[2] = 0;
+    currentState = STATE_START;
+    currentProfile = PROFILE_STANDARD_LEADED;
+    startScreen(currentProfile);
+  }
+  else if (buttonPressed[3] == 1 && currentState == STATE_PROFILE_SELECTION)
+  {
+    buttonPressed[3] = 0;
+    currentState = STATE_START;
+    currentProfile = PROFILE_FAST_LEADED;
+    startScreen(currentProfile);
+  }
   for (int i = 0; i < 4; i++)
   {
-    msg += String(buttonPressed[i]) + " ";
     buttonPressed[i] = 0;
   }
-  Serial.println(msg);
-
   lastTFTwrite = millis();
 }
