@@ -398,55 +398,60 @@ void loop()
     return;
   }
 
-  if (buttonPressed[0] == 1 && currentState == STATE_START)
+  switch (currentState)
   {
-    buttonPressed[0] = 0;
-    currentState = STATE_REFLOW_LANDING;
-    reflowLandingScreen(currentProfile);
-  }
-  else if (buttonPressed[0] == 1 && currentState == STATE_REFLOW_LANDING)
-  {
-    buttonPressed[0] = 0;
-    currentState = STATE_START;
-    startScreen(currentProfile);
-  }
-  else if (buttonPressed[1] == 1 && currentState == STATE_START)
-  {
-    buttonPressed[1] = 0;
-    currentState = STATE_PROFILE_SELECTION;
-    profileSelectScreen();
-  }
-  else if (buttonPressed[0] == 1 && currentState == STATE_PROFILE_SELECTION)
-  {
+  case STATE_START:
+    if (buttonPressed[0] == 1)
+    {
+      buttonPressed[0] = 0;
+      currentState = STATE_REFLOW_LANDING;
+      reflowLandingScreen(currentProfile);
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      buttonPressed[1] = 0;
+      currentState = STATE_PROFILE_SELECTION;
+      profileSelectScreen();
+    }
+    break;
+  case STATE_REFLOW_LANDING:
     buttonPressed[0] = 0;
     currentState = STATE_START;
-    currentProfile = PROFILE_STANDARD_UNLEADED;
     startScreen(currentProfile);
-  }
-  else if (buttonPressed[1] == 1 && currentState == STATE_PROFILE_SELECTION)
-  {
-    buttonPressed[1] = 0;
+    break;
+  case STATE_PROFILE_SELECTION:
+    if (buttonPressed[0] == 1)
+    {
+      buttonPressed[0] = 0;
+      currentProfile = PROFILE_STANDARD_UNLEADED;
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      buttonPressed[1] = 0;
+      currentProfile = PROFILE_FAST_UNLEADED;
+    }
+    else if (buttonPressed[2] == 1)
+    {
+      buttonPressed[2] = 0;
+      currentProfile = PROFILE_STANDARD_LEADED;
+    }
+    else if (buttonPressed[3] == 1)
+    {
+      buttonPressed[3] = 0;
+      currentProfile = PROFILE_FAST_LEADED;
+    }
+
     currentState = STATE_START;
-    currentProfile = PROFILE_FAST_UNLEADED;
     startScreen(currentProfile);
+    break;
+  default:
+    break;
   }
-  else if (buttonPressed[2] == 1 && currentState == STATE_PROFILE_SELECTION)
-  {
-    buttonPressed[2] = 0;
-    currentState = STATE_START;
-    currentProfile = PROFILE_STANDARD_LEADED;
-    startScreen(currentProfile);
-  }
-  else if (buttonPressed[3] == 1 && currentState == STATE_PROFILE_SELECTION)
-  {
-    buttonPressed[3] = 0;
-    currentState = STATE_START;
-    currentProfile = PROFILE_FAST_LEADED;
-    startScreen(currentProfile);
-  }
+
   for (int i = 0; i < 4; i++)
   {
     buttonPressed[i] = 0;
   }
+
   lastTFTwrite = millis();
 }
