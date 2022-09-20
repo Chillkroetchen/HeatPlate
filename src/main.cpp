@@ -104,7 +104,7 @@ void homeScreen(int profileId)
 
   // print max temp and total time of selected profile
   tft.setCursor(100, 105);
-  tft.printf("Max temp: %d °C\n", (int)max_temp);
+  tft.printf("Max temp: %d C\n", (int)max_temp);
   tft.setCursor(100, 120);
   tft.printf("Total time: %d s\n", (int)sum_time);
 }
