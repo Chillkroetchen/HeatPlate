@@ -80,6 +80,43 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
+void readButtons()
+{
+  for (int i = 0; i < 4; i++)
+  {
+    const int reading = digitalRead(BUTTON_PINS[i]);
+
+    if (reading != lastButtonState[i])
+    {
+      lastDebounce = millis();
+    }
+
+    lastButtonState[i] = reading;
+
+    if (!((millis() - lastDebounce) > DEBOUNCE_DELAY && reading != buttonState[i]))
+    {
+      return;
+    }
+
+    buttonState[i] = reading;
+
+    if (buttonState[i] == HIGH)
+    { // Write Button Event here
+      buttonPressed[i] = 1;
+    }
+  }
+}
+
+inline void printStartScreenOption(const int line, const char *text)
+{
+  tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
+  tft.setCursor(108, 101 + 25 * line);
+  tft.println(line + 1);
+  tft.fillRect(125, 95 + 25 * line, 95, 20, TEXT_COLOR);
+  tft.setCursor(130, 101 + 25 * line);
+  tft.println(text);
+}
+
 void startScreen(const int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -96,16 +133,6 @@ void startScreen(const int profileId)
   printStartScreenOption(1, "Select Profile");
   printStartScreenOption(2, "Placeholder");
   printStartScreenOption(3, "Placeholder");
-}
-
-inline void printStartScreenOption(const int line, const char *text)
-{
-  tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
-  tft.setCursor(108, 101 + 25 * line);
-  tft.println(line + 1);
-  tft.fillRect(125, 95 + 25 * line, 95, 20, TEXT_COLOR);
-  tft.setCursor(130, 101 + 25 * line);
-  tft.println(text);
 }
 
 void profileSelectScreen()
@@ -131,67 +158,6 @@ void profileSelectScreen()
 
 void reflowStartedScreen()
 {
-}
-
-void reflowLandingScreen(int profileId)
-{
-  tft.fillScreen(BACKGROUND_COLOR);
-  tft.setTextColor(TEXT_COLOR);
-
-  printTemperatureChart(profileId);
-  printStatusChart();
-
-  // this does not need to be done every time.
-  // consider caching the result
-  const float max_temp = SOLDER_PROFILES[profileId][2][0];
-  float sum_time = 0;
-  for (int i = 0; i < 5; i++)
-  {
-    sum_time += SOLDER_PROFILES[profileId][i][1];
-  }
-
-  printTemperatureGraph(profileId, max_temp, sum_time);
-
-  // textbox for abort
-  tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
-  tft.setTextColor(BACKGROUND_COLOR);
-  tft.setCursor(17, 14);
-  tft.println("Press 1 to abort");
-  tft.setCursor(17, 29);
-  tft.println("Press 2 to start");
-  tft.setTextColor(TEXT_COLOR);
-
-  // print max temp and total time of selected profile
-  tft.setCursor(100, 105);
-  tft.printf("Max temp: %d C\n", (int)max_temp);
-  tft.setCursor(100, 120);
-  tft.printf("Total time: %d s\n", (int)sum_time);
-
-  // endless loop to keep screen updated
-  while (true)
-  {
-    readButtons();
-
-    if (buttonPressed[0] == 1)
-    {
-      buttonPressed[0] = 0;
-      currentState = STATE_START;
-      startScreen(currentProfile);
-      break;
-    }
-    else if (buttonPressed[1] == 1)
-    {
-      buttonPressed[1] = 0;
-      currentState = STATE_REFLOW_STARTED;
-      reflowStartedScreen();
-      break;
-    }
-
-    if (millis() >= lastTFTwrite + 1000)
-    {
-      printStatusChartValues(max_temp, sum_time);
-    }
-  }
 }
 
 inline void printTemperatureChart(const int profileId)
@@ -335,35 +301,69 @@ inline void printTemperatureGraph(const int profileId, const float max_temp, con
   tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 }
 
-void updateReflowValues()
+void reflowLandingScreen(int profileId)
 {
-}
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextColor(TEXT_COLOR);
 
-void readButtons()
-{
-  for (int i = 0; i < 4; i++)
+  printTemperatureChart(profileId);
+  printStatusChart();
+
+  // this does not need to be done every time.
+  // consider caching the result
+  const float max_temp = SOLDER_PROFILES[profileId][2][0];
+  float sum_time = 0;
+  for (int i = 0; i < 5; i++)
   {
-    const int reading = digitalRead(BUTTON_PINS[i]);
+    sum_time += SOLDER_PROFILES[profileId][i][1];
+  }
 
-    if (reading != lastButtonState[i])
+  printTemperatureGraph(profileId, max_temp, sum_time);
+
+  // textbox for abort
+  tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
+  tft.setTextColor(BACKGROUND_COLOR);
+  tft.setCursor(17, 14);
+  tft.println("Press 1 to abort");
+  tft.setCursor(17, 29);
+  tft.println("Press 2 to start");
+  tft.setTextColor(TEXT_COLOR);
+
+  // print max temp and total time of selected profile
+  tft.setCursor(100, 105);
+  tft.printf("Max temp: %d C\n", (int)max_temp);
+  tft.setCursor(100, 120);
+  tft.printf("Total time: %d s\n", (int)sum_time);
+
+  // endless loop to keep screen updated
+  while (true)
+  {
+    readButtons();
+
+    if (buttonPressed[0] == 1)
     {
-      lastDebounce = millis();
+      buttonPressed[0] = 0;
+      currentState = STATE_START;
+      startScreen(currentProfile);
+      break;
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      buttonPressed[1] = 0;
+      currentState = STATE_REFLOW_STARTED;
+      reflowStartedScreen();
+      break;
     }
 
-    lastButtonState[i] = reading;
-
-    if (!((millis() - lastDebounce) > DEBOUNCE_DELAY && reading != buttonState[i]))
+    if (millis() >= lastTFTwrite + 1000)
     {
-      return;
-    }
-
-    buttonState[i] = reading;
-
-    if (buttonState[i] == HIGH)
-    { // Write Button Event here
-      buttonPressed[i] = 1;
+      printStatusChartValues(max_temp, sum_time);
     }
   }
+}
+
+void updateReflowValues()
+{
 }
 
 void setup(void)
