@@ -20,6 +20,7 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 
 #define BACKGROUND_COLOR 0x0820
 #define TEXT_COLOR 0xFFFF
+#define GRAPH_COLOR 0xF800
 
 #define TEMP_SO 26
 #define TEMP_CS1 33
@@ -116,50 +117,6 @@ inline void printStartScreenOption(const int line, const char *text)
   tft.println(text);
 }
 
-void startScreen(const int profileId)
-{
-  tft.fillScreen(BACKGROUND_COLOR);
-  tft.setTextSize(1);
-  tft.setTextColor(BACKGROUND_COLOR);
-
-  tft.fillRect(100, 50, 120, 40, TEXT_COLOR);
-  tft.setCursor(107, 57);
-  tft.println("Selected Profile:");
-  tft.setCursor(107, 75);
-  tft.println(PROFILE_NAMES[profileId]);
-
-  printStartScreenOption(0, "Start Reflow");
-  printStartScreenOption(1, "Select Profile");
-  printStartScreenOption(2, "Placeholder");
-  printStartScreenOption(3, "Placeholder");
-}
-
-void profileSelectScreen()
-{
-  tft.fillScreen(BACKGROUND_COLOR);
-  tft.setTextSize(1);
-  tft.setTextColor(BACKGROUND_COLOR);
-
-  tft.fillRect(80, 60, 160, 20, TEXT_COLOR);
-  tft.setCursor(88, 67);
-  tft.println("Select Profile:");
-
-  // for (int i = 0; i < Profile::MAX; i++) use this line to include custom profiles in screen
-  for (int i = 0; i < 4; i++)
-  {
-    tft.fillRect(80, 85 + 25 * i, 20, 20, TEXT_COLOR);
-    tft.setCursor(88, 92 + 25 * i);
-    tft.println(i + 1);
-    tft.fillRect(105, 85 + 25 * i, 135, 20, TEXT_COLOR);
-    tft.setCursor(110, 92 + 25 * i);
-    tft.println(PROFILE_NAMES[i]);
-  }
-}
-
-void reflowStartedScreen()
-{
-}
-
 inline void printTemperatureChart(const int profileId)
 {
   // print chart for temp curve
@@ -225,7 +182,6 @@ inline void printStatusChart()
 inline void printStatusChartValues(const float max_temp, const float sum_time)
 {
   tft.setTextSize(1);
-  // tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
 
   const int COLUMNS = 5;
   const int Y_VALUES[COLUMNS] = {150, 167, 184, 201, 218};
@@ -301,6 +257,46 @@ inline void printTemperatureGraph(const int profileId, const float max_temp, con
   tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 }
 
+void startScreen(const int profileId)
+{
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextSize(1);
+  tft.setTextColor(BACKGROUND_COLOR);
+
+  tft.fillRect(100, 50, 120, 40, TEXT_COLOR);
+  tft.setCursor(107, 57);
+  tft.println("Selected Profile:");
+  tft.setCursor(107, 75);
+  tft.println(PROFILE_NAMES[profileId]);
+
+  printStartScreenOption(0, "Start Reflow");
+  printStartScreenOption(1, "Select Profile");
+  printStartScreenOption(2, "Placeholder");
+  printStartScreenOption(3, "Placeholder");
+}
+
+void profileSelectScreen()
+{
+  tft.fillScreen(BACKGROUND_COLOR);
+  tft.setTextSize(1);
+  tft.setTextColor(BACKGROUND_COLOR);
+
+  tft.fillRect(80, 60, 160, 20, TEXT_COLOR);
+  tft.setCursor(88, 67);
+  tft.println("Select Profile:");
+
+  // for (int i = 0; i < Profile::MAX; i++) use this line to include custom profiles in screen
+  for (int i = 0; i < 4; i++)
+  {
+    tft.fillRect(80, 85 + 25 * i, 20, 20, TEXT_COLOR);
+    tft.setCursor(88, 92 + 25 * i);
+    tft.println(i + 1);
+    tft.fillRect(105, 85 + 25 * i, 135, 20, TEXT_COLOR);
+    tft.setCursor(110, 92 + 25 * i);
+    tft.println(PROFILE_NAMES[i]);
+  }
+}
+
 void reflowLandingScreen(int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -330,6 +326,8 @@ void reflowLandingScreen(int profileId)
   tft.setTextColor(TEXT_COLOR);
 
   // print max temp and total time of selected profile
+  tft.setCursor(100, 90);
+  tft.printf("Profile: %s\n", PROFILE_NAMES[profileId]);
   tft.setCursor(100, 105);
   tft.printf("Max temp: %d C\n", (int)max_temp);
   tft.setCursor(100, 120);
@@ -360,6 +358,15 @@ void reflowLandingScreen(int profileId)
       printStatusChartValues(max_temp, sum_time);
       lastTFTwrite = millis();
     }
+  }
+}
+
+void reflowStartedScreen(int profileId)
+{
+  readButtons();
+  if (millis() < lastTFTwrite + TFT_DELAY)
+  {
+    return;
   }
 }
 
