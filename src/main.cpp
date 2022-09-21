@@ -81,6 +81,8 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
+void reflowLandingScreen(const int profileId);
+void reflowStartedScreen(const int profileId);
 void readButtons()
 {
   for (int i = 0; i < 4; i++)
@@ -307,17 +309,46 @@ void profileSelectScreen()
   }
 }
 
-void reflowStartedScreen(int profileId)
+void reflowStartedScreen(const int profileId)
 {
-  readButtons();
-  if (millis() < lastTFTwrite + TFT_DELAY)
+  // textbox for abort
+  tft.fillRect(15, 25, 100, 15, BACKGROUND_COLOR);
+  tft.fillRect(15, 10, 137, 15, TEXT_COLOR);
+  tft.setTextColor(BACKGROUND_COLOR);
+  tft.setCursor(17, 14);
+  tft.println("Press any key to abort");
+  tft.setTextColor(TEXT_COLOR);
+  while (true)
   {
-    return;
+    readButtons();
+    Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
+    if (buttonPressed[0] == 1)
+    {
+      buttonPressed[0] = 0;
+      // currentState = STATE_START;
+      // startScreen(profileId);
+      currentState = STATE_REFLOW_LANDING;
+      reflowLandingScreen(profileId);
+      break;
+    }
+    for (int i = 0; i < 4, i++;)
+    {
+      if (buttonPressed[i] == 1)
+      {
+        buttonPressed[i] = 0;
+        break;
+      }
+    }
+
+    if (millis() >= lastTFTwrite + 1000)
+    {
+      printStatusChartValues(profileId);
+      lastTFTwrite = millis();
+    }
   }
-  printStatusChartValues(profileId);
 }
 
-void reflowLandingScreen(int profileId)
+void reflowLandingScreen(const int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(TEXT_COLOR);
@@ -327,11 +358,9 @@ void reflowLandingScreen(int profileId)
 
   // this does not need to be done every time.
   // consider caching the result
-  // const float max_temp = SOLDER_PROFILES[profileId][2][0];
-
   printTemperatureGraph(profileId);
 
-  // textbox for abort
+  // textbox for abort and start
   tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
   tft.setTextColor(BACKGROUND_COLOR);
   tft.setCursor(17, 14);
@@ -352,7 +381,7 @@ void reflowLandingScreen(int profileId)
   while (true)
   {
     readButtons();
-
+    Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
     if (buttonPressed[0] == 1)
     {
       buttonPressed[0] = 0;
@@ -412,7 +441,7 @@ void loop()
     return;
   }
 
-  // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
+  Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
 
   switch (currentState)
   {
