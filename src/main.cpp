@@ -107,6 +107,16 @@ void readButtons()
   }
 }
 
+inline int getTotalTime(const int profileId)
+{
+  float sum_time = 0;
+  for (int i = 0; i < 5; i++)
+  {
+    sum_time += SOLDER_PROFILES[profileId][i][1];
+  }
+  return sum_time;
+}
+
 inline void printStartScreenOption(const int line, const char *text)
 {
   tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
@@ -179,7 +189,7 @@ inline void printStatusChart()
   }
 }
 
-inline void printStatusChartValues(const float max_temp, const float sum_time)
+inline void printStatusChartValues(const int profileId)
 {
   tft.setTextSize(1);
 
@@ -208,7 +218,7 @@ inline void printStatusChartValues(const float max_temp, const float sum_time)
       tft.println("C");
       break;
     case 2:
-      tft.print(int(max_temp));
+      tft.print(int(SOLDER_PROFILES[profileId][2][0]));
       tft.print(" ");
       tft.cp437(true);
       tft.write(167);
@@ -222,14 +232,14 @@ inline void printStatusChartValues(const float max_temp, const float sum_time)
       tft.println("C");
       break;
     case 4:
-      tft.print(int(sum_time));
+      tft.print(getTotalTime(profileId));
       tft.println(" s");
       break;
     }
   }
 }
 
-inline void printTemperatureGraph(const int profileId, const float max_temp, const float max_time)
+inline void printTemperatureGraph(const int profileId)
 {
   const int BOTTOM_LEFT_X = 12;
   const int BOTTOM_LEFT_Y = 132;
@@ -244,8 +254,8 @@ inline void printTemperatureGraph(const int profileId, const float max_temp, con
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int i = 0; i < 5; i++)
   {
-    int deltaX = (SOLDER_PROFILES[profileId][i][1] / max_time) * WIDTH;
-    int deltaY = (SOLDER_PROFILES[profileId][i][0] / max_temp) * HEIGHT;
+    int deltaX = (SOLDER_PROFILES[profileId][i][1] / (float)getTotalTime(profileId)) * WIDTH;
+    int deltaY = (SOLDER_PROFILES[profileId][i][0] / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
 
     tft.drawLine(x, y, x + deltaX, BOTTOM_LEFT_Y - deltaY, TEXT_COLOR);
 
@@ -297,6 +307,16 @@ void profileSelectScreen()
   }
 }
 
+void reflowStartedScreen(int profileId)
+{
+  readButtons();
+  if (millis() < lastTFTwrite + TFT_DELAY)
+  {
+    return;
+  }
+  printStatusChartValues(profileId);
+}
+
 void reflowLandingScreen(int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -307,14 +327,9 @@ void reflowLandingScreen(int profileId)
 
   // this does not need to be done every time.
   // consider caching the result
-  const float max_temp = SOLDER_PROFILES[profileId][2][0];
-  float sum_time = 0;
-  for (int i = 0; i < 5; i++)
-  {
-    sum_time += SOLDER_PROFILES[profileId][i][1];
-  }
+  // const float max_temp = SOLDER_PROFILES[profileId][2][0];
 
-  printTemperatureGraph(profileId, max_temp, sum_time);
+  printTemperatureGraph(profileId);
 
   // textbox for abort
   tft.fillRect(15, 10, 100, 30, TEXT_COLOR);
@@ -329,9 +344,9 @@ void reflowLandingScreen(int profileId)
   tft.setCursor(100, 90);
   tft.printf("Profile: %s\n", PROFILE_NAMES[profileId]);
   tft.setCursor(100, 105);
-  tft.printf("Max temp: %d C\n", (int)max_temp);
+  tft.printf("Max temp: %d C\n", (int)SOLDER_PROFILES[profileId][2][0]);
   tft.setCursor(100, 120);
-  tft.printf("Total time: %d s\n", (int)sum_time);
+  tft.printf("Total time: %d s\n", getTotalTime(profileId));
 
   // endless loop to keep screen updated
   while (true)
@@ -349,24 +364,15 @@ void reflowLandingScreen(int profileId)
     {
       buttonPressed[1] = 0;
       currentState = STATE_REFLOW_STARTED;
-      reflowStartedScreen();
+      reflowStartedScreen(profileId);
       break;
     }
 
     if (millis() >= lastTFTwrite + 1000)
     {
-      printStatusChartValues(max_temp, sum_time);
+      printStatusChartValues(profileId);
       lastTFTwrite = millis();
     }
-  }
-}
-
-void reflowStartedScreen(int profileId)
-{
-  readButtons();
-  if (millis() < lastTFTwrite + TFT_DELAY)
-  {
-    return;
   }
 }
 
