@@ -2,8 +2,11 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
 #include <Arduino.h>
+#include <PID_v1.h>
 #include <SPI.h>
 #include <max6675.h>
+
+#define SSR_PIN 25
 
 #define TFT_CS 5
 #define TFT_RST 2
@@ -26,7 +29,7 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 #define TEMP_CS1 33
 #define TEMP_CS2 14
 #define TEMP_CS3 27
-#define TEMP_SCK 25
+#define TEMP_SCK 12
 
 MAX6675 TEMP1(TEMP_SCK, TEMP_CS1, TEMP_SO);
 MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
