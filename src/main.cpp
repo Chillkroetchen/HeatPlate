@@ -6,8 +6,10 @@
 #include <SPI.h>
 #include <max6675.h>
 
+// PID and SSR Definitions
 #define SSR_PIN 25
 
+// TFT and Touch Definitions
 #define TFT_CS 5
 #define TFT_RST 2
 #define TFT_DC 0
@@ -25,6 +27,10 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 #define TEXT_COLOR 0xFFFF
 #define GRAPH_COLOR 0xF800
 
+#define TFT_DELAY 100
+unsigned long lastTFTwrite;
+
+// Temp Sensor Definitions
 #define TEMP_SO 26
 #define TEMP_CS1 33
 #define TEMP_CS2 14
@@ -42,18 +48,13 @@ MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
 #define BUTTON4 39
 #define DEBOUNCE_DELAY 50
 const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON4};
-int buttonState[4] = {0, 0, 0, 0};
-int lastButtonState[4] = {0, 0, 0, 0};
 int buttonPressed[4] = {0, 0, 0, 0};
-unsigned long lastDebounce;
-
-#define TFT_DELAY 100
-unsigned long lastTFTwrite;
 
 #define MS_TO_S 1000    // ms in s conversion factor
 #define US_TO_S 1000000 // us in s conversion factor
 
 // Menu definitions
+// current state of device
 enum State
 {
   STATE_START,
@@ -62,6 +63,7 @@ enum State
   STATE_REFLOW_STARTED,
 } currentState;
 
+// currently set reflow profile
 enum Profile
 {
   PROFILE_STANDARD_UNLEADED,
@@ -73,8 +75,10 @@ enum Profile
   MAX,
 } currentProfile;
 
+// names of hardcoded reflow profiles
 const char *PROFILE_NAMES[Profile::MAX] = {"Standard Unleaded", "Fast Unleaded", "Standard Leaded",
                                            "Fast Leaded",       "Custom 1",      "Custom 2"};
+// hardcoded reflow profiles consisting of {temp, time}
 const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{170, 85}, {170, 100}, {260, 45}, {260, 25}, {30, 60}}, // Standard Unleaded
     {{150, 30}, {200, 60}, {260, 20}, {260, 20}, {30, 40}},  // Fast Unleaded
@@ -84,12 +88,22 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
+/* Prototypes start */
 void reflowLandingScreen(const int profileId);
 void reflowStartedScreen(const int profileId);
+/* Prototypes end */
+
+// read button routine
 void readButtons()
 {
+  unsigned long lastDebounce;
+  int buttonState[4] = {0, 0, 0, 0};
+  int lastButtonState[4] = {0, 0, 0, 0};
+
+  // debounce routine to be run for each button
   for (int i = 0; i < 4; i++)
-  { // Button Reading Routine
+  {
+    // Button Reading Routine
     int reading = digitalRead(BUTTON_PINS[i]);
     if (reading != lastButtonState[i])
     {
@@ -102,7 +116,8 @@ void readButtons()
         buttonState[i] = reading;
 
         if (buttonState[i] == HIGH)
-        { // Write Button Event here
+        {
+          // Write Button Event here
           buttonPressed[i] = 1;
         }
       }
@@ -112,9 +127,10 @@ void readButtons()
   }
 }
 
+// calculate total time of selected solder profile
 inline int getTotalTime(const int profileId)
 {
-  float sum_time = 0;
+  int sum_time = 0;
   for (int i = 0; i < 5; i++)
   {
     sum_time += SOLDER_PROFILES[profileId][i][1];
@@ -122,6 +138,7 @@ inline int getTotalTime(const int profileId)
   return sum_time;
 }
 
+// fill one line in start screen with identifier and text
 inline void printStartScreenOption(const int line, const char *text)
 {
   tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
@@ -132,6 +149,7 @@ inline void printStartScreenOption(const int line, const char *text)
   tft.println(text);
 }
 
+// print temperature chart in reflow screen and fill with values of currently selected reflow profile
 inline void printTemperatureChart(const int profileId)
 {
   // print chart for temp curve
@@ -144,8 +162,8 @@ inline void printTemperatureChart(const int profileId)
   const int ROWS = 6;
   const int WIDTH = 36;
   const char *TITLES[COLUMNS] = {"Point", "Temp", "Time"};
-  const int X_VALUES[COLUMNS] = {203, 240, 277};
-  const int Y_VALUES[ROWS] = {146, 164, 178, 192, 206, 220};
+  const int X_VALUES[COLUMNS] = {203, 240, 277};             // delta = 37 each
+  const int Y_VALUES[ROWS] = {146, 164, 178, 192, 206, 220}; // delta = 18 first line, delta = 14 other lines
 
   char cell_content_buf[3];
 
@@ -176,6 +194,7 @@ inline void printTemperatureChart(const int profileId)
   }
 }
 
+// print status chart in reflow screen
 inline void printStatusChart()
 {
   tft.setTextSize(1);
@@ -194,6 +213,7 @@ inline void printStatusChart()
   }
 }
 
+// fill/update status chart with values in reflow screen
 inline void printStatusChartValues(const int profileId, const int currentTime)
 {
   tft.setTextSize(1);
@@ -228,6 +248,7 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
   }
 }
 
+// print ideal temperature graph of selected reflow profile in reflow screen
 inline void printTemperatureGraph(const int profileId)
 {
   const int BOTTOM_LEFT_X = 12;
@@ -237,17 +258,22 @@ inline void printTemperatureGraph(const int profileId)
   const int WIDTH = TOP_RIGHT_X - BOTTOM_LEFT_X;
   const int HEIGHT = BOTTOM_LEFT_Y - TOP_RIGHT_Y;
 
+  // initialize x & y with the bottom left corner of screen
   int x = BOTTOM_LEFT_X;
   int y = BOTTOM_LEFT_Y;
 
   // calculate X/Y coordinates of reflow curve in respect to screen space available
   for (int i = 0; i < 5; i++)
   {
+    // calculate required X delta: (StepTime of profile / TotalTime of profile) * ScreenWidth available
     int deltaX = (SOLDER_PROFILES[profileId][i][1] / (float)getTotalTime(profileId)) * WIDTH;
+    // calculate required Y delta: (StepTemp of profile / MaxTemp of profile) * ScreenHeight available
     int deltaY = (SOLDER_PROFILES[profileId][i][0] / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
 
+    // draw line from old X & Y to new X & Y
     tft.drawLine(x, y, x + deltaX, BOTTOM_LEFT_Y - deltaY, TEXT_COLOR);
 
+    // update X & Y with calculated delta to print next line
     y = BOTTOM_LEFT_Y - deltaY;
     x += deltaX;
   }
@@ -256,6 +282,7 @@ inline void printTemperatureGraph(const int profileId)
   tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
 }
 
+// print actual temperature graph while reflow process is running
 inline void printReflowGraph(const int profileId, const int currentTime)
 {
   const int BOTTOM_LEFT_X = 12;
@@ -265,12 +292,15 @@ inline void printReflowGraph(const int profileId, const int currentTime)
   const int WIDTH = TOP_RIGHT_X - BOTTOM_LEFT_X;
   const int HEIGHT = BOTTOM_LEFT_Y - TOP_RIGHT_Y;
 
+  // calculate X: (TimeElapsed of process / TotalTime of profile) * ScreenWidth available
   float x = BOTTOM_LEFT_X + ((currentTime / (float)getTotalTime(profileId)) * WIDTH);
+  // calculate Y: (TempSensor / MaxTemp of profile) * ScreenWidth available
   float y = BOTTOM_LEFT_Y - (TEMP3.readCelsius() / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
-
+  // draw pixel in calculated location
   tft.drawPixel(x, y, GRAPH_COLOR);
 }
 
+// print start screen with selected reflow profile
 void startScreen(const int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -291,6 +321,7 @@ void startScreen(const int profileId)
   printStartScreenOption(3, "Placeholder");
 }
 
+// print profile select screen to select desired reflow profile
 void profileSelectScreen()
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -313,6 +344,9 @@ void profileSelectScreen()
   }
 }
 
+// print landing screen for reflow process
+// user can check all values of selected profile on screen and decide to start or abort
+// current temperature readings are periodically updated
 void reflowLandingScreen(const int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -349,6 +383,8 @@ void reflowLandingScreen(const int profileId)
   {
     readButtons();
     // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
+
+    // press button 1 to abort
     if (buttonPressed[0] == 1)
     {
       buttonPressed[0] = 0;
@@ -356,6 +392,7 @@ void reflowLandingScreen(const int profileId)
       startScreen(currentProfile);
       break;
     }
+    // press button 2 to start reflow
     else if (buttonPressed[1] == 1)
     {
       buttonPressed[1] = 0;
@@ -364,6 +401,7 @@ void reflowLandingScreen(const int profileId)
       break;
     }
 
+    // update once per second
     if (millis() >= lastTFTwrite + 1000)
     {
       printStatusChartValues(profileId, 0);
@@ -372,6 +410,9 @@ void reflowLandingScreen(const int profileId)
   }
 }
 
+// keep screen updated after reflow process started
+// current temperature readings are periodically updated
+// actual temperature graph is drawn to compare with ideal profile
 void reflowStartedScreen(const int profileId)
 {
   // textbox for abort
@@ -419,10 +460,6 @@ void reflowStartedScreen(const int profileId)
   }
 }
 
-void updateReflowValues()
-{
-}
-
 void setup(void)
 {
   Serial.begin(115200);
@@ -450,6 +487,7 @@ void loop()
 {
   readButtons();
 
+  // do nothing if TFT_DELAY hasn't passed
   if (millis() < lastTFTwrite + TFT_DELAY)
   {
     return;
@@ -457,15 +495,18 @@ void loop()
 
   // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
 
+  // switch case for different device states
   switch (currentState)
   {
   case STATE_START:
+    // press button 1 to start reflow process
     if (buttonPressed[0] == 1)
     {
       buttonPressed[0] = 0;
       currentState = STATE_REFLOW_LANDING;
       reflowLandingScreen(currentProfile);
     }
+    // press button 2 to select desired reflow profile
     else if (buttonPressed[1] == 1)
     {
       buttonPressed[1] = 0;
@@ -474,11 +515,13 @@ void loop()
     }
     break;
   case STATE_REFLOW_LANDING:
+    // needs to be updated as soon as while loop is removed from reflowLandingScreen()
     buttonPressed[0] = 0;
     currentState = STATE_START;
     startScreen(currentProfile);
     break;
   case STATE_PROFILE_SELECTION:
+    // selects reflow profile according to pressed button
     if (buttonPressed[0] == 1)
     {
       buttonPressed[0] = 0;
@@ -512,6 +555,7 @@ void loop()
     break;
   }
 
+  // reset all buttons to 0 to avoid phantom button presses
   for (int i = 0; i < 4; i++)
   {
     buttonPressed[i] = 0;
