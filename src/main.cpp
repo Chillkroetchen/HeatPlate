@@ -191,7 +191,7 @@ inline void printStatusChart()
   }
 }
 
-inline void printStatusChartValues(const int profileId)
+inline void printStatusChartValues(const int profileId, const int currentTime)
 {
   tft.setTextSize(1);
 
@@ -218,7 +218,7 @@ inline void printStatusChartValues(const int profileId)
       tft.printf("%d C", int(TEMP3.readCelsius()));
       break;
     case 4:
-      tft.print(getTotalTime(profileId));
+      tft.print(getTotalTime(profileId) - currentTime);
       tft.println(" s");
       break;
     }
@@ -251,6 +251,21 @@ inline void printTemperatureGraph(const int profileId)
 
   tft.fillRect(5, 5, 2, 134, TEXT_COLOR);   // y-axis
   tft.fillRect(5, 137, 310, 2, TEXT_COLOR); // x-axis
+}
+
+inline void printReflowGraph(const int profileId, const int currentTime)
+{
+  const int BOTTOM_LEFT_X = 12;
+  const int BOTTOM_LEFT_Y = 132;
+  const int TOP_RIGHT_X = 310;
+  const int TOP_RIGHT_Y = 10;
+  const int WIDTH = TOP_RIGHT_X - BOTTOM_LEFT_X;
+  const int HEIGHT = BOTTOM_LEFT_Y - TOP_RIGHT_Y;
+
+  float x = BOTTOM_LEFT_X + ((currentTime / (float)getTotalTime(profileId)) * WIDTH);
+  float y = BOTTOM_LEFT_Y - (TEMP3.readCelsius() / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
+
+  tft.drawPixel(x, y, GRAPH_COLOR);
 }
 
 void startScreen(const int profileId)
@@ -348,7 +363,7 @@ void reflowLandingScreen(const int profileId)
 
     if (millis() >= lastTFTwrite + 1000)
     {
-      printStatusChartValues(profileId);
+      printStatusChartValues(profileId, 0);
       lastTFTwrite = millis();
     }
   }
@@ -363,6 +378,11 @@ void reflowStartedScreen(const int profileId)
   tft.setCursor(17, 14);
   tft.println("Press any key to abort");
   tft.setTextColor(TEXT_COLOR);
+
+  lastTFTwrite = millis();
+  int t = 0;
+  int tmax = getTotalTime(profileId);
+  // endless loop to keep screen updated
   while (true)
   {
     bool breakLoop = false;
@@ -375,7 +395,7 @@ void reflowStartedScreen(const int profileId)
         break;
       }
     }
-    if (breakLoop == true)
+    if (breakLoop == true || t >= tmax)
     {
       for (int i = 0; i < 4; i++)
       {
@@ -388,8 +408,10 @@ void reflowStartedScreen(const int profileId)
 
     if (millis() >= lastTFTwrite + 1000)
     {
-      printStatusChartValues(profileId);
+      printReflowGraph(profileId, t);
+      printStatusChartValues(profileId, t);
       lastTFTwrite = millis();
+      t++;
     }
   }
 }
