@@ -49,6 +49,9 @@ MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
 #define DEBOUNCE_DELAY 50
 const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON4};
 int buttonPressed[4] = {0, 0, 0, 0};
+unsigned long lastDebounce;
+int buttonState[4] = {0, 0, 0, 0};
+int lastButtonState[4] = {0, 0, 0, 0};
 
 #define MS_TO_S 1000    // ms in s conversion factor
 #define US_TO_S 1000000 // us in s conversion factor
@@ -96,10 +99,6 @@ void reflowStartedScreen(const int profileId);
 // read button routine
 void readButtons()
 {
-  unsigned long lastDebounce;
-  int buttonState[4] = {0, 0, 0, 0};
-  int lastButtonState[4] = {0, 0, 0, 0};
-
   // debounce routine to be run for each button
   for (int i = 0; i < 4; i++)
   {
