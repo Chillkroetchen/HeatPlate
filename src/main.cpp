@@ -91,6 +91,8 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}                 // Custom 2
 };
 
+int reflowRuntime = 0;
+
 /* Prototypes start */
 void reflowLandingScreen(const int profileId);
 void reflowStartedScreen(const int profileId);
@@ -345,7 +347,6 @@ void profileSelectScreen()
 
 // print landing screen for reflow process
 // user can check all values of selected profile on screen and decide to start or abort
-// current temperature readings are periodically updated
 void reflowLandingScreen(const int profileId)
 {
   tft.fillScreen(BACKGROUND_COLOR);
@@ -376,42 +377,9 @@ void reflowLandingScreen(const int profileId)
   tft.printf("Max temp: %d C\n", (int)SOLDER_PROFILES[profileId][2][0]);
   tft.setCursor(100, 120);
   tft.printf("Total time: %d s\n", getTotalTime(profileId));
-
-  // endless loop to keep screen updated
-  while (true)
-  {
-    readButtons();
-    // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
-
-    // press button 1 to abort
-    if (buttonPressed[0] == 1)
-    {
-      buttonPressed[0] = 0;
-      currentState = STATE_START;
-      startScreen(currentProfile);
-      break;
-    }
-    // press button 2 to start reflow
-    else if (buttonPressed[1] == 1)
-    {
-      buttonPressed[1] = 0;
-      currentState = STATE_REFLOW_STARTED;
-      reflowStartedScreen(profileId);
-      break;
-    }
-
-    // update once per second
-    if (millis() >= lastTFTwrite + 1000)
-    {
-      printStatusChartValues(profileId, 0);
-      lastTFTwrite = millis();
-    }
-  }
 }
 
 // keep screen updated after reflow process started
-// current temperature readings are periodically updated
-// actual temperature graph is drawn to compare with ideal profile
 void reflowStartedScreen(const int profileId)
 {
   // textbox for abort
@@ -423,40 +391,6 @@ void reflowStartedScreen(const int profileId)
   tft.setTextColor(TEXT_COLOR);
 
   lastTFTwrite = millis();
-  int t = 0;
-  int tmax = getTotalTime(profileId);
-  // endless loop to keep screen updated
-  while (true)
-  {
-    bool breakLoop = false;
-    readButtons();
-    for (int i = 0; i < 4; i++)
-    {
-      if (buttonPressed[i] == 1)
-      {
-        breakLoop = true;
-        break;
-      }
-    }
-    if (breakLoop == true || t >= tmax)
-    {
-      for (int i = 0; i < 4; i++)
-      {
-        buttonPressed[i] = 0;
-      }
-      currentState = STATE_REFLOW_LANDING;
-      reflowLandingScreen(profileId);
-      break;
-    }
-
-    if (millis() >= lastTFTwrite + 1000)
-    {
-      printReflowGraph(profileId, t);
-      printStatusChartValues(profileId, t);
-      lastTFTwrite = millis();
-      t++;
-    }
-  }
 }
 
 void setup(void)
@@ -484,6 +418,8 @@ void setup(void)
 
 void loop()
 {
+  const int tmax = getTotalTime(currentProfile);
+  bool breakLoop = false;
   readButtons();
 
   // do nothing if TFT_DELAY hasn't passed
@@ -492,9 +428,7 @@ void loop()
     return;
   }
 
-  // Serial.printf("Buttons: %d %d %d %d\n", buttonPressed[0], buttonPressed[1], buttonPressed[2], buttonPressed[3]);
-
-  // switch case for different device states
+  // switch statement for different device states
   switch (currentState)
   {
   case STATE_START:
@@ -512,12 +446,6 @@ void loop()
       currentState = STATE_PROFILE_SELECTION;
       profileSelectScreen();
     }
-    break;
-  case STATE_REFLOW_LANDING:
-    // needs to be updated as soon as while loop is removed from reflowLandingScreen()
-    buttonPressed[0] = 0;
-    currentState = STATE_START;
-    startScreen(currentProfile);
     break;
   case STATE_PROFILE_SELECTION:
     // selects reflow profile according to pressed button
@@ -550,6 +478,49 @@ void loop()
     currentState = STATE_START;
     startScreen(currentProfile);
     break;
+  case STATE_REFLOW_LANDING:
+    if (millis() >= lastTFTwrite + 1000)
+    {
+      printStatusChartValues(currentProfile, 0);
+      lastTFTwrite = millis();
+    }
+    if (buttonPressed[0] == 1)
+    {
+      buttonPressed[0] = 0;
+      currentState = STATE_START;
+      startScreen(currentProfile);
+    }
+    else if (buttonPressed[1] == 1)
+    {
+      buttonPressed[1] = 0;
+      currentState = STATE_REFLOW_STARTED;
+      reflowStartedScreen(currentProfile);
+    }
+    break;
+  case STATE_REFLOW_STARTED:
+    for (int i = 0; i < 4; i++)
+    {
+      if (buttonPressed[i] == 1)
+      {
+        breakLoop = true;
+        break;
+      }
+    }
+    if (breakLoop == true || reflowRuntime >= tmax)
+    {
+      currentState = STATE_REFLOW_LANDING;
+      reflowLandingScreen(currentProfile);
+      reflowRuntime = 0;
+      break;
+    }
+    if (millis() >= lastTFTwrite + 1000)
+    {
+      printReflowGraph(currentProfile, reflowRuntime);
+      printStatusChartValues(currentProfile, reflowRuntime);
+      lastTFTwrite = millis();
+      reflowRuntime++;
+    }
+    break;
   default:
     break;
   }
@@ -560,5 +531,5 @@ void loop()
     buttonPressed[i] = 0;
   }
 
-  lastTFTwrite = millis();
+  // lastTFTwrite = millis();
 }
