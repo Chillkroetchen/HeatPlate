@@ -1,3 +1,4 @@
+#include <AceButton.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
@@ -5,6 +6,8 @@
 #include <PID_v1.h>
 #include <SPI.h>
 #include <max6675.h>
+
+using namespace ace_button;
 
 // PID and SSR Definitions
 #define SSR_PIN 25
@@ -42,16 +45,17 @@ MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
 MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
 
 // Button definitions
-#define BUTTON1 32
-#define BUTTON2 35
-#define BUTTON3 34
-#define BUTTON4 39
+#define BUTTON_PIN1 32
+#define BUTTON_PIN2 35
+#define BUTTON_PIN3 34
+#define BUTTON_PIN4 39
 #define DEBOUNCE_DELAY 50
-const int BUTTON_PINS[4] = {BUTTON1, BUTTON2, BUTTON3, BUTTON4};
-int buttonPressed[4] = {0, 0, 0, 0};
-unsigned long lastDebounce;
-int buttonState[4] = {0, 0, 0, 0};
-int lastButtonState[4] = {0, 0, 0, 0};
+const int BUTTON_PINS[4] = {BUTTON_PIN1, BUTTON_PIN2, BUTTON_PIN3, BUTTON_PIN4};
+
+AceButton button1(BUTTON_PIN1);
+AceButton button2(BUTTON_PIN2);
+AceButton button3(BUTTON_PIN3);
+AceButton button4(BUTTON_PIN4);
 
 #define MS_TO_S 1000    // ms in s conversion factor
 #define US_TO_S 1000000 // us in s conversion factor
@@ -96,37 +100,8 @@ int reflowRuntime = 0;
 /* Prototypes start */
 void reflowLandingScreen(const int profileId);
 void reflowStartedScreen(const int profileId);
+void handleEvent(AceButton *, uint8_t, uint8_t);
 /* Prototypes end */
-
-// read button routine
-void readButtons()
-{
-  // debounce routine to be run for each button
-  for (int i = 0; i < 4; i++)
-  {
-    // Button Reading Routine
-    int reading = digitalRead(BUTTON_PINS[i]);
-    if (reading != lastButtonState[i])
-    {
-      lastDebounce = millis();
-    }
-    if ((millis() - lastDebounce) > DEBOUNCE_DELAY)
-    {
-      if (reading != buttonState[i])
-      {
-        buttonState[i] = reading;
-
-        if (buttonState[i] == HIGH)
-        {
-          // Write Button Event here
-          buttonPressed[i] = 1;
-        }
-      }
-    }
-    lastButtonState[i] = reading;
-    // End Button Reading Routine
-  }
-}
 
 // calculate total time of selected solder profile
 inline int getTotalTime(const int profileId)
@@ -142,6 +117,7 @@ inline int getTotalTime(const int profileId)
 // fill one line in start screen with identifier and text
 inline void printStartScreenOption(const int line, const char *text)
 {
+  Serial.println("TRACE > printStartScreenOption()");
   tft.fillRect(100, 95 + 25 * line, 20, 20, TEXT_COLOR);
   tft.setCursor(108, 101 + 25 * line);
   tft.println(line + 1);
@@ -153,6 +129,8 @@ inline void printStartScreenOption(const int line, const char *text)
 // print temperature chart in reflow screen and fill with values of currently selected reflow profile
 inline void printTemperatureChart(const int profileId)
 {
+  Serial.println("TRACE > printTemperatureChart()");
+
   // print chart for temp curve
   tft.setTextSize(1);
 
@@ -198,6 +176,8 @@ inline void printTemperatureChart(const int profileId)
 // print status chart in reflow screen
 inline void printStatusChart()
 {
+  Serial.println("TRACE > printStatusChart()");
+
   tft.setTextSize(1);
   tft.fillRect(5, 148, 150, 87, TEXT_COLOR);
 
@@ -217,6 +197,8 @@ inline void printStatusChart()
 // fill/update status chart with values in reflow screen
 inline void printStatusChartValues(const int profileId, const int currentTime)
 {
+  Serial.println("TRACE > printStatusChartValues()");
+
   tft.setTextSize(1);
 
   const int COLUMNS = 5;
@@ -230,16 +212,43 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
     switch (row)
     {
     case 0:
-      tft.printf("%d C", int(TEMP1.readCelsius()));
+      if (int(TEMP1.readCelsius()) > 50)
+      {
+        tft.setTextColor(GRAPH_COLOR);
+        tft.printf("WARN!");
+        tft.setTextColor(TEXT_COLOR);
+      }
+      else
+      {
+        tft.printf("%d C", int(TEMP1.readCelsius()));
+      }
       break;
     case 1:
-      tft.printf("%d C", int(TEMP2.readCelsius()));
+      if (int(TEMP2.readCelsius()) > 50)
+      {
+        tft.setTextColor(GRAPH_COLOR);
+        tft.printf("WARN!");
+        tft.setTextColor(TEXT_COLOR);
+      }
+      else
+      {
+        tft.printf("%d C", int(TEMP2.readCelsius()));
+      }
       break;
     case 2:
       tft.printf("%d C", int(SOLDER_PROFILES[profileId][2][0]));
       break;
     case 3:
-      tft.printf("%d C", int(TEMP3.readCelsius()));
+      if (int(TEMP3.readCelsius()) > 280)
+      {
+        tft.setTextColor(GRAPH_COLOR);
+        tft.printf("WARN!");
+        tft.setTextColor(TEXT_COLOR);
+      }
+      else
+      {
+        tft.printf("%d C", int(TEMP3.readCelsius()));
+      }
       break;
     case 4:
       tft.print(getTotalTime(profileId) - currentTime);
@@ -252,6 +261,8 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
 // print ideal temperature graph of selected reflow profile in reflow screen
 inline void printTemperatureGraph(const int profileId)
 {
+  Serial.println("TRACE > printTemperatureGraph()");
+
   const int BOTTOM_LEFT_X = 12;
   const int BOTTOM_LEFT_Y = 132;
   const int TOP_RIGHT_X = 310;
@@ -286,6 +297,8 @@ inline void printTemperatureGraph(const int profileId)
 // print actual temperature graph while reflow process is running
 inline void printReflowGraph(const int profileId, const int currentTime)
 {
+  Serial.println("TRACE > printReflowGraph()");
+
   const int BOTTOM_LEFT_X = 12;
   const int BOTTOM_LEFT_Y = 132;
   const int TOP_RIGHT_X = 310;
@@ -304,6 +317,8 @@ inline void printReflowGraph(const int profileId, const int currentTime)
 // print start screen with selected reflow profile
 void startScreen(const int profileId)
 {
+  Serial.println("TRACE > startScreen()");
+
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextSize(1);
   tft.setTextColor(BACKGROUND_COLOR);
@@ -325,6 +340,8 @@ void startScreen(const int profileId)
 // print profile select screen to select desired reflow profile
 void profileSelectScreen()
 {
+  Serial.println("TRACE > profileSelectScreen()");
+
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextSize(1);
   tft.setTextColor(BACKGROUND_COLOR);
@@ -349,11 +366,14 @@ void profileSelectScreen()
 // user can check all values of selected profile on screen and decide to start or abort
 void reflowLandingScreen(const int profileId)
 {
+  Serial.println("TRACE > reflowLandingScreen()");
+
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(TEXT_COLOR);
 
   printTemperatureChart(profileId);
   printStatusChart();
+  printStatusChartValues(profileId, 0);
 
   // this does not need to be done every time.
   // consider caching the result
@@ -382,6 +402,8 @@ void reflowLandingScreen(const int profileId)
 // keep screen updated after reflow process started
 void reflowStartedScreen(const int profileId)
 {
+  Serial.println("TRACE > reflowStartedScreen()");
+
   // textbox for abort
   tft.fillRect(15, 25, 100, 15, BACKGROUND_COLOR);
   tft.fillRect(15, 10, 137, 15, TEXT_COLOR);
@@ -397,139 +419,218 @@ void setup(void)
 {
   Serial.begin(115200);
 
-  pinMode(BUTTON1, INPUT);
-  pinMode(BUTTON2, INPUT);
-  pinMode(BUTTON3, INPUT);
-  pinMode(BUTTON4, INPUT);
+  // Configure the ButtonConfig with the event handler, and enable all higher
+  // level events.
+  ButtonConfig *buttonConfig = ButtonConfig::getSystemButtonConfig();
+  buttonConfig->setEventHandler(handleEvent);
+  // buttonConfig->setFeature(ButtonConfig::kFeatureClick);
+  // buttonConfig->setFeature(ButtonConfig::kFeatureDoubleClick);
+  // buttonConfig->setFeature(ButtonConfig::kFeatureLongPress);
+  // buttonConfig->setFeature(ButtonConfig::kFeatureRepeatPress);
+
+  // if (button1.isPressedRaw())
+  // {
+  //   Serial.println(F("setup(): button 1 was pressed while booting"));
+  // }
+
+  pinMode(BUTTON_PIN1, INPUT);
+  pinMode(BUTTON_PIN2, INPUT);
+  pinMode(BUTTON_PIN3, INPUT);
+  pinMode(BUTTON_PIN4, INPUT);
+
   Serial.println("Temp Sensor test");
   tft.init(240, 320); // Init ST7789 320x240
   Serial.println("TFT Initialized");
   tft.invertDisplay(false);
-  tft.fillScreen(ST77XX_BLACK);
   tft.setRotation(45);
 
-  startScreen(currentProfile);
+  currentProfile = PROFILE_FAST_LEADED;
+  currentState = STATE_START;
+  // startScreen(currentProfile);
 
   Serial.println("Temperature Readings:");
   Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
   Serial.printf("\tSensor 2: %f °C", TEMP2.readCelsius());
-  Serial.printf("\tSensor 3: %f °C", TEMP3.readCelsius());
+  Serial.printf("\tSensor 3: %f °C\n", TEMP3.readCelsius());
 }
 
-void loop()
-{
-  const int tmax = getTotalTime(currentProfile);
-  bool breakLoop = false;
-  readButtons();
+bool requestedRedraw = true;
 
-  // do nothing if TFT_DELAY hasn't passed
-  if (millis() < lastTFTwrite + TFT_DELAY)
+void drawScreen()
+{
+  if (!requestedRedraw)
   {
     return;
   }
 
-  // switch statement for different device states
   switch (currentState)
   {
   case STATE_START:
-    // press button 1 to start reflow process
-    if (buttonPressed[0] == 1)
-    {
-      buttonPressed[0] = 0;
-      currentState = STATE_REFLOW_LANDING;
-      reflowLandingScreen(currentProfile);
-    }
-    // press button 2 to select desired reflow profile
-    else if (buttonPressed[1] == 1)
-    {
-      buttonPressed[1] = 0;
-      currentState = STATE_PROFILE_SELECTION;
-      profileSelectScreen();
-    }
+    startScreen(currentProfile);
+    Serial.println("TRACE > drawscreen(): startScreen");
     break;
   case STATE_PROFILE_SELECTION:
-    // selects reflow profile according to pressed button
-    if (buttonPressed[0] == 1)
-    {
-      buttonPressed[0] = 0;
-      currentProfile = PROFILE_STANDARD_UNLEADED;
-    }
-    else if (buttonPressed[1] == 1)
-    {
-      buttonPressed[1] = 0;
-      currentProfile = PROFILE_FAST_UNLEADED;
-    }
-    else if (buttonPressed[2] == 1)
-    {
-      buttonPressed[2] = 0;
-      currentProfile = PROFILE_STANDARD_LEADED;
-    }
-    else if (buttonPressed[3] == 1)
-    {
-      Serial.println(buttonPressed[3]);
-      buttonPressed[3] = 0;
-      currentProfile = PROFILE_FAST_LEADED;
-    }
-    else
-    {
-      break;
-    }
-
-    currentState = STATE_START;
-    startScreen(currentProfile);
+    profileSelectScreen();
+    Serial.println("TRACE > drawscreen(): profileSelectScreen");
     break;
   case STATE_REFLOW_LANDING:
-    if (millis() >= lastTFTwrite + 1000)
-    {
-      printStatusChartValues(currentProfile, 0);
-      lastTFTwrite = millis();
-    }
-    if (buttonPressed[0] == 1)
-    {
-      buttonPressed[0] = 0;
-      currentState = STATE_START;
-      startScreen(currentProfile);
-    }
-    else if (buttonPressed[1] == 1)
-    {
-      buttonPressed[1] = 0;
-      currentState = STATE_REFLOW_STARTED;
-      reflowStartedScreen(currentProfile);
-    }
+    reflowLandingScreen(currentProfile);
+    Serial.println("TRACE > drawscreen(): reflowLandingScreen");
     break;
   case STATE_REFLOW_STARTED:
-    for (int i = 0; i < 4; i++)
-    {
-      if (buttonPressed[i] == 1)
-      {
-        breakLoop = true;
-        break;
-      }
-    }
-    if (breakLoop == true || reflowRuntime >= tmax)
-    {
-      currentState = STATE_REFLOW_LANDING;
-      reflowLandingScreen(currentProfile);
-      reflowRuntime = 0;
-      break;
-    }
-    if (millis() >= lastTFTwrite + 1000)
-    {
-      printReflowGraph(currentProfile, reflowRuntime);
-      printStatusChartValues(currentProfile, reflowRuntime);
-      lastTFTwrite = millis();
-      reflowRuntime++;
-    }
+    reflowStartedScreen(currentProfile);
+    Serial.println("TRACE > drawscreen(): reflowStartedScreen");
     break;
   default:
     break;
   }
 
-  // reset all buttons to 0 to avoid phantom button presses
-  for (int i = 0; i < 4; i++)
+  requestedRedraw = false;
+}
+
+void drawScreenUpdate()
+{
+  if (millis() - lastTFTwrite > 1000)
   {
-    buttonPressed[i] = 0;
+    lastTFTwrite = millis();
+
+    switch (currentState)
+    {
+    case STATE_REFLOW_LANDING:
+      printStatusChartValues(currentProfile, 0);
+
+      break;
+    case STATE_REFLOW_STARTED:
+      printReflowGraph(currentProfile, reflowRuntime);
+      printStatusChartValues(currentProfile, reflowRuntime);
+      reflowRuntime++;
+
+      break;
+    default:
+      break;
+    }
+  }
+}
+
+void loop()
+{
+  unsigned long start = millis();
+
+  button1.check();
+  button2.check();
+  button3.check();
+  button4.check();
+
+  drawScreen();
+  drawScreenUpdate();
+
+  // Serial.printf("Current Profile: %d\n", currentProfile);
+
+  unsigned long duration = millis() - start;
+  if (duration >= 20)
+  {
+    Serial.printf("WARN > loop(): took too long %d ms\n", duration);
+  }
+}
+
+void handleEvent(AceButton *button, uint8_t eventType, uint8_t buttonState)
+{
+  // Print out a message for all events, for both buttons.
+  Serial.print(F("TRACE > handleEvent(): pin: "));
+  Serial.print(button->getPin());
+  Serial.print(F("; eventType: "));
+  Serial.print(eventType);
+  Serial.print(F("; buttonState: "));
+  Serial.print(buttonState);
+  Serial.print(F("; currentState: "));
+  Serial.print(currentState);
+  Serial.print(F("; currentProfile: "));
+  Serial.println(currentProfile);
+
+  const int tmax = getTotalTime(currentProfile);
+
+  State lastState = currentState;
+
+  switch (currentState)
+  {
+  case STATE_START:
+    switch (eventType)
+    {
+    case AceButton::kEventPressed:
+      switch (button->getPin())
+      {
+        // press button 1 to start reflow process
+      case BUTTON_PIN1:
+        currentState = STATE_REFLOW_LANDING;
+        break;
+        // press button 2 to select desired reflow profile
+      case BUTTON_PIN2:
+        currentState = STATE_PROFILE_SELECTION;
+        break;
+      }
+    }
+
+    break;
+  case STATE_PROFILE_SELECTION:
+    // selects reflow profile according to pressed button
+    switch (eventType)
+    {
+    case AceButton::kEventPressed:
+      switch (button->getPin())
+      {
+      case BUTTON_PIN1:
+        currentProfile = PROFILE_STANDARD_UNLEADED;
+        break;
+      case BUTTON_PIN2:
+        currentProfile = PROFILE_FAST_UNLEADED;
+        break;
+      case BUTTON_PIN3:
+        currentProfile = PROFILE_STANDARD_LEADED;
+        break;
+      case BUTTON_PIN4:
+        currentProfile = PROFILE_FAST_LEADED;
+        break;
+      }
+
+      Serial.print("TRACE > handleEvent(): currentProfile -> ");
+      Serial.println(currentProfile);
+      currentState = STATE_START;
+    }
+
+    break;
+  case STATE_REFLOW_LANDING:
+    switch (eventType)
+    {
+    case AceButton::kEventPressed:
+      switch (button->getPin())
+      {
+      case BUTTON_PIN1:
+        currentState = STATE_START;
+        break;
+      case BUTTON_PIN2:
+        currentState = STATE_REFLOW_STARTED;
+        break;
+      }
+    }
+
+    break;
+  case STATE_REFLOW_STARTED:
+    if (eventType == AceButton::kEventPressed)
+    {
+      break;
+    }
+
+    if (reflowRuntime >= tmax)
+    {
+      currentState = STATE_REFLOW_LANDING;
+      reflowRuntime = 0;
+    }
+
+    break;
   }
 
-  // lastTFTwrite = millis();
+  if (lastState != currentState)
+  {
+    requestedRedraw = true;
+  }
 }
