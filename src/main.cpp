@@ -68,6 +68,7 @@ enum State
   STATE_PROFILE_SELECTION,
   STATE_REFLOW_LANDING,
   STATE_REFLOW_STARTED,
+  STATE_REFLOW_FINISHED,
 } currentState;
 
 // currently set reflow profile
@@ -415,6 +416,16 @@ void reflowStartedScreen(const int profileId)
   lastTFTwrite = millis();
 }
 
+void reflowFinishedScreen()
+{
+  tft.fillRect(15, 10, 140, 30, BACKGROUND_COLOR);
+  tft.fillRect(100, 90, 130, 40, BACKGROUND_COLOR);
+  tft.setCursor(100, 90);
+  tft.print("Reflow Done!");
+  tft.setCursor(100, 105);
+  tft.print("Press any button to continue!");
+}
+
 void setup(void)
 {
   Serial.begin(115200);
@@ -481,6 +492,10 @@ void drawScreen()
     reflowStartedScreen(currentProfile);
     Serial.println("TRACE > drawscreen(): reflowStartedScreen");
     break;
+  case STATE_REFLOW_FINISHED:
+    reflowFinishedScreen();
+    Serial.println("TRACE > drawscreen(): reflowFinishedScreen");
+    break;
   default:
     break;
   }
@@ -490,6 +505,8 @@ void drawScreen()
 
 void drawScreenUpdate()
 {
+  State lastState = currentState;
+
   if (millis() - lastTFTwrite > 1000)
   {
     lastTFTwrite = millis();
@@ -501,14 +518,27 @@ void drawScreenUpdate()
 
       break;
     case STATE_REFLOW_STARTED:
-      printReflowGraph(currentProfile, reflowRuntime);
-      printStatusChartValues(currentProfile, reflowRuntime);
-      reflowRuntime++;
+      if (reflowRuntime > getTotalTime(currentProfile))
+      {
+        reflowRuntime = 0;
+        currentState = STATE_REFLOW_FINISHED;
+      }
+      else
+      {
+        printReflowGraph(currentProfile, reflowRuntime);
+        printStatusChartValues(currentProfile, reflowRuntime);
+        reflowRuntime++;
+      }
 
       break;
     default:
       break;
     }
+  }
+
+  if (lastState != currentState)
+  {
+    requestedRedraw = true;
   }
 }
 
@@ -620,13 +650,14 @@ void handleEvent(AceButton *button, uint8_t eventType, uint8_t buttonState)
       break;
     }
 
-    if (reflowRuntime >= tmax)
-    {
-      currentState = STATE_REFLOW_LANDING;
-      reflowRuntime = 0;
-    }
-
     break;
+  case STATE_REFLOW_FINISHED:
+    switch (eventType)
+    {
+    case AceButton::kEventPressed:
+      currentState = STATE_START;
+      break;
+    }
   }
 
   if (lastState != currentState)
