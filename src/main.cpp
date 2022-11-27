@@ -14,6 +14,13 @@ using namespace ace_button;
 #define PWM_CHANNEL 0
 #define PWM_FREQ 2 // PWM Frequency in Hz
 #define PWM_RES 8  // PWM Resolution in bit
+double Setpoint;
+double Input;
+double Output;
+double Kp = 2;
+double Ki = 5;
+double Kd = 1;
+PID THERMO_CONTROL(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 /* PID and SSR Definitions end */
 
 /* TFT and Touch Definitions start */
@@ -107,7 +114,7 @@ int reflowRuntime = 0;
 /* Menu definitions end */
 
 /* Multi Core Setup start */
-TaskHandle_t DISPLAY_HANDLER;
+TaskHandle_t BUTTON_HANDLER;
 TaskHandle_t PWM_OUTPUT;
 /* Multi Core Setup end */
 
@@ -115,7 +122,8 @@ TaskHandle_t PWM_OUTPUT;
 void reflowLandingScreen(const int profileId);
 void reflowStartedScreen(const int profileId);
 void handleEvent(AceButton *, uint8_t, uint8_t);
-void DISPLAY_HANDLER_CODE(void *pvParameters);
+void BUTTON_HANDLER_CODE(void *pvParameters);
+int getSetPoint(const int profileId, const int runtime);
 /* Prototypes end */
 
 unsigned long lastSerialPrint0 = millis();
@@ -254,7 +262,7 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
       }
       break;
     case 2:
-      tft.printf("%d C", int(SOLDER_PROFILES[profileId][2][0]));
+      tft.printf("%d C", getSetPoint(currentProfile, currentTime));
       break;
     case 3:
       if (int(TEMP3.readCelsius()) > 280)
@@ -466,13 +474,13 @@ void setup(void)
   pinMode(BUTTON_PIN3, INPUT);
   pinMode(BUTTON_PIN4, INPUT);
 
-  xTaskCreatePinnedToCore(DISPLAY_HANDLER_CODE, /* Task function */
-                          "Display Handler",    /* Name of Task */
-                          10000,                /* Stack size of Task */
-                          NULL,                 /* Parameter of Task */
-                          5,                    /* Priority of the Task */
-                          &DISPLAY_HANDLER,     /* Task Handle to keep track of created Task */
-                          0);                   /* Pin Task to Core */
+  xTaskCreatePinnedToCore(BUTTON_HANDLER_CODE, /* Task function */
+                          "Display Handler",   /* Name of Task */
+                          10000,               /* Stack size of Task */
+                          NULL,                /* Parameter of Task */
+                          5,                   /* Priority of the Task */
+                          &BUTTON_HANDLER,     /* Task Handle to keep track of created Task */
+                          0);                  /* Pin Task to Core */
 
   tft.init(240, 320); // Init ST7789 320x240
   Serial.println("TFT Initialized");
@@ -487,6 +495,9 @@ void setup(void)
   Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
   Serial.printf("\tSensor 2: %f °C", TEMP2.readCelsius());
   Serial.printf("\tSensor 3: %f °C\n", TEMP3.readCelsius());
+
+  THERMO_CONTROL.SetMode(AUTOMATIC);
+  Serial.println("PID initialized");
 
   ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RES);
   ledcAttachPin(PWM_PIN, PWM_CHANNEL);
@@ -539,7 +550,7 @@ void drawScreenUpdate()
 
   if (millis() - lastTFTwrite > 1000)
   {
-    Serial.printf("INFO > drawScreenUpdate(): running on core %d\n", xPortGetCoreID());
+    // Serial.printf("INFO > drawScreenUpdate(): running on core %d\n", xPortGetCoreID());
     lastTFTwrite = millis();
 
     switch (currentState)
@@ -573,7 +584,7 @@ void drawScreenUpdate()
   }
 }
 
-void DISPLAY_HANDLER_CODE(void *pvParameters)
+void BUTTON_HANDLER_CODE(void *pvParameters)
 {
   for (;;)
   {
@@ -587,25 +598,60 @@ void DISPLAY_HANDLER_CODE(void *pvParameters)
     vTaskDelay(10);
     yield();
 
+    /*
     unsigned long duration0 = millis() - start0;
     if ((millis() - lastSerialPrint0) > 1000)
     {
       lastSerialPrint0 = millis();
-      Serial.printf("INFO > DISPLAY_HANDLER_CODE(): running on core %d\n", xPortGetCoreID());
-      Serial.printf("INFO > DISPLAY_HANDLER_CODE(): took %d ms\n", duration0);
+      Serial.printf("INFO > BUTTON_HANDLER_CODE(): running on core %d\n", xPortGetCoreID());
+      Serial.printf("INFO > BUTTON_HANDLER_CODE(): took %d ms\n", duration0);
     }
+    */
   }
+}
+
+int getSetPoint(const int profileId, const int runtime)
+{
+  int setPoint;
+  // first ramp
+  if (runtime < SOLDER_PROFILES[currentProfile][0][1])
+  {
+    setPoint = SOLDER_PROFILES[currentProfile][0][0];
+    // maybe add fancy setpoint ramp here
+  }
+  // hold temp
+  else if (runtime >= SOLDER_PROFILES[currentProfile][0][1] &&
+           runtime < (SOLDER_PROFILES[currentProfile][0][1] + SOLDER_PROFILES[currentProfile][1][1]))
+  {
+    setPoint = SOLDER_PROFILES[currentProfile][1][0];
+  }
+  // second ramp
+  else if (runtime >= (SOLDER_PROFILES[currentProfile][0][1] + SOLDER_PROFILES[currentProfile][1][1]) &&
+           runtime < (SOLDER_PROFILES[currentProfile][0][1] + SOLDER_PROFILES[currentProfile][1][1] +
+                      SOLDER_PROFILES[currentProfile][2][1]))
+  {
+    setPoint = SOLDER_PROFILES[currentProfile][2][0];
+    // maybe add fancy setpoint ramp here
+  }
+  // hold temp
+  else if (runtime >= (SOLDER_PROFILES[currentProfile][0][1] + SOLDER_PROFILES[currentProfile][1][1] +
+                       SOLDER_PROFILES[currentProfile][2][1]) &&
+           runtime < (SOLDER_PROFILES[currentProfile][0][1] + SOLDER_PROFILES[currentProfile][1][1] +
+                      SOLDER_PROFILES[currentProfile][2][1] + SOLDER_PROFILES[currentProfile][3][1]))
+  {
+    setPoint = SOLDER_PROFILES[currentProfile][3][0];
+  }
+  // cooldown
+  else
+  {
+    setPoint = 0;
+  }
+  return setPoint;
 }
 
 void loop()
 {
   unsigned long start = millis();
-
-  /*button1.check();
-  button2.check();
-  button3.check();
-  button4.check();
-  */
 
   drawScreen();
   drawScreenUpdate();
@@ -614,8 +660,26 @@ void loop()
   if ((millis() - lastSerialPrint1) > 1000)
   {
     lastSerialPrint1 = millis();
-    Serial.printf("INFO > loop(): running on core %d\n", xPortGetCoreID());
-    Serial.printf("INFO > loop(): took %d ms\n", duration);
+    // Serial.printf("INFO > loop(): running on core %d\n", xPortGetCoreID());
+    // Serial.printf("INFO > loop(): took %d ms\n", duration);
+    if (currentState == STATE_REFLOW_STARTED && reflowRuntime < getTotalTime(currentProfile))
+    {
+      Input = double(TEMP3.readCelsius());
+      Setpoint = double(getSetPoint(currentProfile, reflowRuntime));
+      THERMO_CONTROL.Compute();
+
+      ledcWrite(PWM_CHANNEL, Output);
+
+      Serial.println("TRACE > loop(): PID calculation started");
+      Serial.printf("\tInput: %f", Input);
+      Serial.printf("\tSetpoint: %f", Setpoint);
+      Serial.printf("\tOutput: %f\n", Output);
+    }
+    else
+    {
+      ledcWrite(PWM_CHANNEL, 0);
+      Serial.println("INFO > loop(): PWM off");
+    }
   }
 }
 
