@@ -9,10 +9,14 @@
 
 using namespace ace_button;
 
-// PID and SSR Definitions
-#define SSR_PIN 25
+/* PID and SSR Definitions start */
+#define PWM_PIN 25
+#define PWM_CHANNEL 0
+#define PWM_FREQ 2 // PWM Frequency in Hz
+#define PWM_RES 8  // PWM Resolution in bit
+/* PID and SSR Definitions end */
 
-// TFT and Touch Definitions
+/* TFT and Touch Definitions start */
 #define TFT_CS 5
 #define TFT_RST 2
 #define TFT_DC 0
@@ -26,14 +30,15 @@ using namespace ace_button;
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
-#define BACKGROUND_COLOR 0x0820
-#define TEXT_COLOR 0xFFFF
-#define GRAPH_COLOR 0xF800
+#define BACKGROUND_COLOR 0x0820 // blueish black
+#define TEXT_COLOR 0xFFFF       // white
+#define GRAPH_COLOR 0xF800      // red
 
 #define TFT_DELAY 100
 unsigned long lastTFTwrite;
+/* TFT and Touch Definitions end */
 
-// Temp Sensor Definitions
+/* Temp Sensor Definitions start */
 #define TEMP_SO 26
 #define TEMP_CS1 33
 #define TEMP_CS2 14
@@ -43,8 +48,9 @@ unsigned long lastTFTwrite;
 MAX6675 TEMP1(TEMP_SCK, TEMP_CS1, TEMP_SO);
 MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
 MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
+/* Temp Sensor Definitions end */
 
-// Button definitions
+/* Button definitions start */
 #define BUTTON_PIN1 32
 #define BUTTON_PIN2 35
 #define BUTTON_PIN3 34
@@ -56,11 +62,12 @@ AceButton button1(BUTTON_PIN1);
 AceButton button2(BUTTON_PIN2);
 AceButton button3(BUTTON_PIN3);
 AceButton button4(BUTTON_PIN4);
+/* Button definitions end */
 
 #define MS_TO_S 1000    // ms in s conversion factor
 #define US_TO_S 1000000 // us in s conversion factor
 
-// Menu definitions
+/* Menu definitions start */
 // current state of device
 enum State
 {
@@ -97,12 +104,22 @@ const int SOLDER_PROFILES[Profile::MAX][5][2]{
 };
 
 int reflowRuntime = 0;
+/* Menu definitions end */
+
+/* Multi Core Setup start */
+TaskHandle_t DISPLAY_HANDLER;
+TaskHandle_t PWM_OUTPUT;
+/* Multi Core Setup end */
 
 /* Prototypes start */
 void reflowLandingScreen(const int profileId);
 void reflowStartedScreen(const int profileId);
 void handleEvent(AceButton *, uint8_t, uint8_t);
+void DISPLAY_HANDLER_CODE(void *pvParameters);
 /* Prototypes end */
+
+unsigned long lastSerialPrint0 = millis();
+unsigned long lastSerialPrint1 = millis();
 
 // calculate total time of selected solder profile
 inline int getTotalTime(const int profileId)
@@ -449,7 +466,14 @@ void setup(void)
   pinMode(BUTTON_PIN3, INPUT);
   pinMode(BUTTON_PIN4, INPUT);
 
-  Serial.println("Temp Sensor test");
+  xTaskCreatePinnedToCore(DISPLAY_HANDLER_CODE, /* Task function */
+                          "Display Handler",    /* Name of Task */
+                          10000,                /* Stack size of Task */
+                          NULL,                 /* Parameter of Task */
+                          5,                    /* Priority of the Task */
+                          &DISPLAY_HANDLER,     /* Task Handle to keep track of created Task */
+                          0);                   /* Pin Task to Core */
+
   tft.init(240, 320); // Init ST7789 320x240
   Serial.println("TFT Initialized");
   tft.invertDisplay(false);
@@ -457,12 +481,16 @@ void setup(void)
 
   currentProfile = PROFILE_FAST_LEADED;
   currentState = STATE_START;
-  // startScreen(currentProfile);
 
+  Serial.println("Temperature Sensor Test");
   Serial.println("Temperature Readings:");
   Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
   Serial.printf("\tSensor 2: %f °C", TEMP2.readCelsius());
   Serial.printf("\tSensor 3: %f °C\n", TEMP3.readCelsius());
+
+  ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RES);
+  ledcAttachPin(PWM_PIN, PWM_CHANNEL);
+  Serial.println("PWM Output initialized");
 }
 
 bool requestedRedraw = true;
@@ -473,6 +501,8 @@ void drawScreen()
   {
     return;
   }
+
+  Serial.printf("INFO > drawScreen(): running on core %d\n", xPortGetCoreID());
 
   switch (currentState)
   {
@@ -509,6 +539,7 @@ void drawScreenUpdate()
 
   if (millis() - lastTFTwrite > 1000)
   {
+    Serial.printf("INFO > drawScreenUpdate(): running on core %d\n", xPortGetCoreID());
     lastTFTwrite = millis();
 
     switch (currentState)
@@ -542,30 +573,56 @@ void drawScreenUpdate()
   }
 }
 
+void DISPLAY_HANDLER_CODE(void *pvParameters)
+{
+  for (;;)
+  {
+    unsigned long start0 = millis();
+    // drawScreen();
+    // drawScreenUpdate();
+    button1.check();
+    button2.check();
+    button3.check();
+    button4.check();
+    vTaskDelay(10);
+    yield();
+
+    unsigned long duration0 = millis() - start0;
+    if ((millis() - lastSerialPrint0) > 1000)
+    {
+      lastSerialPrint0 = millis();
+      Serial.printf("INFO > DISPLAY_HANDLER_CODE(): running on core %d\n", xPortGetCoreID());
+      Serial.printf("INFO > DISPLAY_HANDLER_CODE(): took %d ms\n", duration0);
+    }
+  }
+}
+
 void loop()
 {
   unsigned long start = millis();
 
-  button1.check();
+  /*button1.check();
   button2.check();
   button3.check();
   button4.check();
+  */
 
   drawScreen();
   drawScreenUpdate();
 
-  // Serial.printf("Current Profile: %d\n", currentProfile);
-
   unsigned long duration = millis() - start;
-  if (duration >= 20)
+  if ((millis() - lastSerialPrint1) > 1000)
   {
-    Serial.printf("WARN > loop(): took too long %d ms\n", duration);
+    lastSerialPrint1 = millis();
+    Serial.printf("INFO > loop(): running on core %d\n", xPortGetCoreID());
+    Serial.printf("INFO > loop(): took %d ms\n", duration);
   }
 }
 
 void handleEvent(AceButton *button, uint8_t eventType, uint8_t buttonState)
 {
   // Print out a message for all events, for both buttons.
+  Serial.printf("INFO > handleEvent(): running on core %d\n", xPortGetCoreID());
   Serial.print(F("TRACE > handleEvent(): pin: "));
   Serial.print(button->getPin());
   Serial.print(F("; eventType: "));
