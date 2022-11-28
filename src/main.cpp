@@ -14,6 +14,7 @@ using namespace ace_button;
 #define PWM_CHANNEL 0
 #define PWM_FREQ 2 // PWM Frequency in Hz
 #define PWM_RES 8  // PWM Resolution in bit
+
 double Setpoint;
 double Input;
 double Output;
@@ -47,14 +48,14 @@ unsigned long lastTFTwrite;
 
 /* Temp Sensor Definitions start */
 #define TEMP_SO 26
-#define TEMP_CS1 33
-#define TEMP_CS2 14
-#define TEMP_CS3 27
+#define TEMP_CS1 33 // Plate Sensor 1
+#define TEMP_CS2 14 // Plate Sensor 2
+#define TEMP_CS3 27 // Housing Sensor
 #define TEMP_SCK 12
 
-MAX6675 TEMP1(TEMP_SCK, TEMP_CS1, TEMP_SO);
-MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO);
-MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO);
+MAX6675 TEMP1(TEMP_SCK, TEMP_CS1, TEMP_SO); // Plate Sensor 1
+MAX6675 TEMP2(TEMP_SCK, TEMP_CS2, TEMP_SO); // Plate Sensor 2
+MAX6675 TEMP3(TEMP_SCK, TEMP_CS3, TEMP_SO); // Housing Sensor
 /* Temp Sensor Definitions end */
 
 /* Button definitions start */
@@ -229,6 +230,12 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
 
   const int COLUMNS = 5;
   const int Y_VALUES[COLUMNS] = {150, 167, 184, 201, 218};
+  float temp = (TEMP1.readCelsius() + TEMP2.readCelsius()) / 2;
+
+  Serial.println("TRACE > printStatusChartValues(): Temperature Readings:");
+  Serial.printf("\tSensor 1: %f °C", TEMP1.readCelsius());
+  Serial.printf("\tSensor 2: %f °C", TEMP2.readCelsius());
+  Serial.printf("\tSensor 3: %f °C\n", TEMP3.readCelsius());
 
   for (int row = 0; row < COLUMNS; row++)
   {
@@ -237,8 +244,9 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
 
     switch (row)
     {
+    // Temp MCU
     case 0:
-      if (int(TEMP1.readCelsius()) > 50)
+      if (true)
       {
         tft.setTextColor(GRAPH_COLOR);
         tft.printf("WARN!");
@@ -249,26 +257,12 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
         tft.printf("%d C", int(TEMP1.readCelsius()));
       }
       break;
+    // Temp Housing
     case 1:
-      if (int(TEMP2.readCelsius()) > 50)
+      if (int(TEMP3.readCelsius()) > 50)
       {
         tft.setTextColor(GRAPH_COLOR);
-        tft.printf("WARN!");
-        tft.setTextColor(TEXT_COLOR);
-      }
-      else
-      {
-        tft.printf("%d C", int(TEMP2.readCelsius()));
-      }
-      break;
-    case 2:
-      tft.printf("%d C", getSetPoint(currentProfile, currentTime));
-      break;
-    case 3:
-      if (int(TEMP3.readCelsius()) > 280)
-      {
-        tft.setTextColor(GRAPH_COLOR);
-        tft.printf("WARN!");
+        tft.printf("%d C", int(TEMP3.readCelsius()));
         tft.setTextColor(TEXT_COLOR);
       }
       else
@@ -276,6 +270,24 @@ inline void printStatusChartValues(const int profileId, const int currentTime)
         tft.printf("%d C", int(TEMP3.readCelsius()));
       }
       break;
+    // Temp Setpoint
+    case 2:
+      tft.printf("%d C", getSetPoint(currentProfile, currentTime));
+      break;
+    // Temp Plate
+    case 3:
+      if (temp > 280 || temp < 0)
+      {
+        tft.setTextColor(GRAPH_COLOR);
+        tft.printf("WARN!");
+        tft.setTextColor(TEXT_COLOR);
+      }
+      else
+      {
+        tft.printf("%i C", int(temp));
+      }
+      break;
+    // Runtime
     case 4:
       tft.print(getTotalTime(profileId) - currentTime);
       tft.println(" s");
@@ -331,11 +343,12 @@ inline void printReflowGraph(const int profileId, const int currentTime)
   const int TOP_RIGHT_Y = 10;
   const int WIDTH = TOP_RIGHT_X - BOTTOM_LEFT_X;
   const int HEIGHT = BOTTOM_LEFT_Y - TOP_RIGHT_Y;
+  float temp = (TEMP1.readCelsius() + TEMP2.readCelsius()) / 2;
 
   // calculate X: (TimeElapsed of process / TotalTime of profile) * ScreenWidth available
   float x = BOTTOM_LEFT_X + ((currentTime / (float)getTotalTime(profileId)) * WIDTH);
   // calculate Y: (TempSensor / MaxTemp of profile) * ScreenWidth available
-  float y = BOTTOM_LEFT_Y - (TEMP3.readCelsius() / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
+  float y = BOTTOM_LEFT_Y - (temp / (float)SOLDER_PROFILES[profileId][2][0]) * HEIGHT;
   // draw pixel in calculated location
   tft.drawPixel(x, y, GRAPH_COLOR);
 }
@@ -664,7 +677,8 @@ void loop()
     // Serial.printf("INFO > loop(): took %d ms\n", duration);
     if (currentState == STATE_REFLOW_STARTED && reflowRuntime < getTotalTime(currentProfile))
     {
-      Input = double(TEMP3.readCelsius());
+      float temp = (TEMP1.readCelsius() + TEMP2.readCelsius()) / 2;
+      Input = double(temp);
       Setpoint = double(getSetPoint(currentProfile, reflowRuntime));
       THERMO_CONTROL.Compute();
 
@@ -766,8 +780,10 @@ void handleEvent(AceButton *button, uint8_t eventType, uint8_t buttonState)
 
     break;
   case STATE_REFLOW_STARTED:
-    if (eventType == AceButton::kEventPressed)
+    switch (eventType)
     {
+    case AceButton::kEventPressed:
+      currentState = STATE_REFLOW_LANDING;
       break;
     }
 
