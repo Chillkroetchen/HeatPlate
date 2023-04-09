@@ -783,7 +783,7 @@ void handleEvent(AceButton *button, uint8_t eventType, uint8_t buttonState)
     switch (eventType)
     {
     case AceButton::kEventPressed:
-      currentState = STATE_REFLOW_LANDING;
+      currentState = STATE_START;
       break;
     }
 
