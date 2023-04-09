@@ -11,4 +11,4 @@
 **/.DS_Store
 
 # ignore .clang-format file
-.clang-format
+*clang-format
